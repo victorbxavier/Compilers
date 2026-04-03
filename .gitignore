@@ -1,0 +1,8 @@
+# Flex generated file
+lex.yy.c
+
+# Compiled binary
+lexer
+
+# Object files
+*.o
