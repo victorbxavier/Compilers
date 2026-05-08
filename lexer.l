@@ -50,10 +50,11 @@ int lines = 0;
 "new"           {printf("NEW\n");}
 
 // User created Words
-[a-zA-Z][a-zA-Z0-9]*  { printf("Id: %s\n", yytext); }
+[a-zA-Z][a-zA-Z0-9]*  { words++; chars += strlen(yytext); printf("Id: %s\n", yytext); }
 [ \t\n]         { /* ignore whitespace */ }
-[\/\/.*]         {// Ignore single line comments}
-[\/\*][.][\*\/]     {}
+[\/\/.*]         { /* Ignore single line comments */}
+"/*"[^*]*\*+([^/][^*]*\*+)*"/"  { /* Ignore multiple line comments */}
+\n              { /* Ignores new line */}
 .               { printf("UNKNOWN: %s\n", yytext); }
 %%
 
