@@ -1,0 +1,5 @@
+class TestError {
+    public static void main(String[] args){
+        14 = a;
+    }
+}

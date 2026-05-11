@@ -1,0 +1,126 @@
+#ifndef TOKEN_H
+#define TOKEN_H
+
+#include <string>
+#include <vector>
+#include <iostream>
+
+enum class TokenType {
+    // Palavras-chave
+    CLASS,
+    PUBLIC,
+    STATIC,
+    VOID,
+    MAIN,
+    STRING,
+    RETURN,
+    INT,
+    BOOLEAN,
+    IF,
+    ELSE,
+    WHILE,
+    SYSTEM,
+    OUT,
+    PRINTLN,
+    TRUE,
+    FALSE,
+    THIS,
+    NEW,
+    EXTENDS,
+    LENGTH,
+
+    // Operadores
+    AND,        // &&
+    LT,         // <
+    GT,         // >
+    PLUS,       // +
+    MINUS,      // -
+    MULT,       // *
+    ASSIGN,     // =
+    NOT,        // !
+
+    // Delimitadores
+    LPAREN,     // (
+    RPAREN,     // )
+    LBRACKET,   // [
+    RBRACKET,   // ]
+    LBRACE,     // {
+    RBRACE,     // }
+    SEMICOLON,  // ;
+    COMMA,      // ,
+    DOT,        // .
+
+    // Literais e identificadores
+    ID,
+    NUMBER,
+
+    // Controle
+    END_OF_FILE,
+    UNKNOWN
+};
+
+struct Token {
+    TokenType type;
+    std::string lexeme;
+    int line;
+};
+
+// Converte TokenType para string legível
+inline std::string tokenTypeToString(TokenType type) {
+    switch (type) {
+        case TokenType::CLASS:      return "CLASS";
+        case TokenType::PUBLIC:     return "PUBLIC";
+        case TokenType::STATIC:     return "STATIC";
+        case TokenType::VOID:       return "VOID";
+        case TokenType::MAIN:       return "MAIN";
+        case TokenType::STRING:     return "STRING";
+        case TokenType::RETURN:     return "RETURN";
+        case TokenType::INT:        return "INT";
+        case TokenType::BOOLEAN:    return "BOOLEAN";
+        case TokenType::IF:         return "IF";
+        case TokenType::ELSE:       return "ELSE";
+        case TokenType::WHILE:      return "WHILE";
+        case TokenType::SYSTEM:     return "SYSTEM";
+        case TokenType::OUT:        return "OUT";
+        case TokenType::PRINTLN:    return "PRINTLN";
+        case TokenType::TRUE:       return "TRUE";
+        case TokenType::FALSE:      return "FALSE";
+        case TokenType::THIS:       return "THIS";
+        case TokenType::NEW:        return "NEW";
+        case TokenType::EXTENDS:    return "EXTENDS";
+        case TokenType::LENGTH:     return "LENGTH";
+        case TokenType::AND:        return "AND";
+        case TokenType::LT:         return "LT";
+        case TokenType::GT:         return "GT";
+        case TokenType::PLUS:       return "PLUS";
+        case TokenType::MINUS:      return "MINUS";
+        case TokenType::MULT:       return "MULT";
+        case TokenType::ASSIGN:     return "ASSIGN";
+        case TokenType::NOT:        return "NOT";
+        case TokenType::LPAREN:     return "LPAREN";
+        case TokenType::RPAREN:     return "RPAREN";
+        case TokenType::LBRACKET:   return "LBRACKET";
+        case TokenType::RBRACKET:   return "RBRACKET";
+        case TokenType::LBRACE:     return "LBRACE";
+        case TokenType::RBRACE:     return "RBRACE";
+        case TokenType::SEMICOLON:  return "SEMICOLON";
+        case TokenType::COMMA:      return "COMMA";
+        case TokenType::DOT:        return "DOT";
+        case TokenType::ID:         return "ID";
+        case TokenType::NUMBER:     return "NUMBER";
+        case TokenType::END_OF_FILE: return "EOF";
+        case TokenType::UNKNOWN:    return "UNKNOWN";
+    }
+    return "UNKNOWN";
+}
+
+// Imprime um token formatado
+inline void printToken(const Token& tok) {
+    std::cout << "<" << tokenTypeToString(tok.type);
+    if (tok.type == TokenType::ID || tok.type == TokenType::NUMBER || tok.type == TokenType::UNKNOWN) {
+        std::cout << ", \"" << tok.lexeme << "\"";
+    }
+    std::cout << ", line " << tok.line << ">" << std::endl;
+}
+
+#endif // TOKEN_H

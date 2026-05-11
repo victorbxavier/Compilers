@@ -1,14 +1,12 @@
-- [ ] Email para confirmar a realização do
+- [ ] Email para confirmar necessidade de implementar pré-processador
 - [ ] Terminar o lexer
-	- [ ] Transformar o código de C para C++
-	- [ ] Gerar uma lista de Tokens
+  - [ ] Transformar o código de C para C++
+  - [ ] Gerar uma lista de Tokens
 - [ ] Terminar o parser
-	- [ ] Funções de variaveis
-	- [ ] Tabela de simbolos
-	- [ ] Grammar Transformation
-	- [ ] Consumir as gramáticas
-Divisão de tarefas
-Here's a clean way to divide the project among 5 members:
+  - [ ] Funções de variaveis
+  - [ ] Tabela de simbolos
+  - [ ] Grammar Transformation
+  - [ ] Consumir as gramáticas
 
 ---
 
@@ -125,12 +123,12 @@ Both start with `'class' Id`.
 
 ## ✅ What Needs to Be Done
 
-|Rule|Problem|Action|
-|---|---|---|
-|`Exp`|Left recursion|Rewrite with `Exp'` tail rule|
-|`DefMet`|Common prefix `'public' Type Id '('`|Left factor|
-|`DefCl`|Common prefix `'class' Id`|Left factor|
-|`Word`|Left recursion (`Number Word`, `Char Word`)|Check & fix|
+| Rule     | Problem                                     | Action                        |
+| -------- | ------------------------------------------- | ----------------------------- |
+| `Exp`    | Left recursion                              | Rewrite with `Exp'` tail rule |
+| `DefMet` | Common prefix `'public' Type Id '('`        | Left factor                   |
+| `DefCl`  | Common prefix `'class' Id`                  | Left factor                   |
+| `Word`   | Left recursion (`Number Word`, `Char Word`) | Check & fix                   |
 
 ---
 
@@ -243,10 +241,10 @@ Now the parser sees `(` and then looks ahead:
 
 ## Summary
 
-|Situation|Solution|
-|---|---|
-|Two rules start with the same tokens|Extract the common prefix|
-|Create a new variable for the rest|Name it `A'` or `A_tail`|
-|The new variable covers the diverging parts|Including `λ` if needed|
+| Situation                                   | Solution                  |
+| ------------------------------------------- | ------------------------- |
+| Two rules start with the same tokens        | Extract the common prefix |
+| Create a new variable for the rest          | Name it `A'` or `A_tail`  |
+| The new variable covers the diverging parts | Including `λ` if needed   |
 
 It's essentially making the grammar **unambiguous for a top-down parser** by ensuring every decision can be made with just one token of lookahead.

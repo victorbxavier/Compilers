@@ -1,8 +1,13 @@
-# Flex generated file
+# Build artifacts
+build/
+
+# Flex generated files
+lex.yy.c
 lex.yy.cc
 
-# Compiled binary
+# Compiled binaries
 lexer
+compiler
 
 # Object files
 *.o
