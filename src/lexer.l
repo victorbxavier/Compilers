@@ -1,20 +1,48 @@
 %{
+/**
+ * @file lexer.l
+ * @brief Analisador Lexico (Lexer) do compilador MiniJava, implementado com Flex.
+ *
+ * O Flex gera um automato finito deterministico (AFD) a partir das regras
+ * de expressoes regulares definidas abaixo. O AFD percorre o codigo fonte
+ * caractere a caractere, identificando padroes e gerando tokens.
+ *
+ * Responsabilidades deste modulo:
+ *   1. PRE-PROCESSAMENTO: remover comentarios e whitespace
+ *   2. TOKENIZACAO: reconhecer palavras-chave, operadores, delimitadores,
+ *      identificadores e numeros, gerando um Token para cada um
+ *   3. TRATAMENTO DE ERROS: reportar caracteres invalidos com sugestoes
+ *      de correcao baseadas em distancia de Levenshtein
+ *
+ * Saida: preenche o vetor global tokenList[] com todos os tokens encontrados.
+ *
+ * Estrutura do arquivo Flex (.l):
+ *   Secao 1 (%{ ... %})  -> Codigo C++ copiado diretamente para o .c gerado
+ *   Secao 2 (definicoes) -> Macros de expressoes regulares reutilizaveis
+ *   Secao 3 (%% ... %%)  -> Regras padrao->acao (o coracao do lexer)
+ */
+
 #include "token.h"
 #include <string>
 #include <vector>
 #include <cstring>
 #include <algorithm>
 
-// Lista global de tokens gerados
+// Lista de todos os tokens gerados durante a analise lexica.
+// Preenchida sequencialmente conforme o Flex reconhece padroes.
 std::vector<Token> tokenList;
 
-// Flag para indicar se houve erro léxico
+// Flag que indica se algum erro lexico foi encontrado.
+// Se true, o main.cpp nao prossegue para a analise sintatica.
 bool lexerHadError = false;
 
-// Contador de linha
+// Contador manual de linhas. Incrementado a cada '\n' encontrado.
+// Usado para reportar a localizacao de erros ao usuario.
 int lineNumber = 1;
 
-// Palavras-chave da linguagem (para sugestões de erro)
+// Lista de palavras-chave da linguagem (usada para sugestoes de correcao).
+// Quando o lexer encontra um token invalido, compara com estas palavras
+// para sugerir a correcao mais provavel.
 static const char* keywords[] = {
     "class", "public", "static", "void", "main", "String",
     "return", "int", "boolean", "if", "else", "while",
@@ -22,7 +50,13 @@ static const char* keywords[] = {
     "new", "extends", "length", nullptr
 };
 
-// Função auxiliar para adicionar token à lista
+/**
+ * @brief Cria um Token e o adiciona ao final de tokenList[].
+ * @param type Tipo do token (ex: TokenType::CLASS, TokenType::ID)
+ * @param text yytext do Flex -- variavel automatica que contem o trecho exato
+ *             do codigo fonte que casou com a regra atual (ex: ";", "class", "myVar")
+ * @param line Numero da linha atual
+ */
 void addToken(TokenType type, const char* text, int line) {
     Token tok;
     tok.type = type;
@@ -31,7 +65,15 @@ void addToken(TokenType type, const char* text, int line) {
     tokenList.push_back(tok);
 }
 
-// Calcula distância de Levenshtein para sugestões
+/**
+ * @brief Calcula a distancia de Levenshtein entre duas strings.
+ *
+ * A distancia de Levenshtein mede o numero minimo de operacoes
+ * (insercao, remocao, substituicao) para transformar s1 em s2.
+ * Usada para encontrar a palavra-chave mais proxima de um token invalido.
+ *
+ * Exemplo: levenshtein("clas", "class") = 1 (falta um 's')
+ */
 int levenshtein(const std::string& s1, const std::string& s2) {
     int len1 = s1.size(), len2 = s2.size();
     std::vector<std::vector<int>> dp(len1 + 1, std::vector<int>(len2 + 1));
@@ -46,7 +88,16 @@ int levenshtein(const std::string& s1, const std::string& s2) {
     return dp[len1][len2];
 }
 
-// Sugere correções para identificadores inválidos
+/**
+ * @brief Reporta erro lexico e sugere correcao se possivel.
+ *
+ * Compara o token invalido com todas as palavras-chave usando
+ * distancia de Levenshtein. Se a distancia for <= 2, sugere a correcao.
+ *
+ * Exemplo de saida:
+ *   Erro lexico na linha 3: token invalido "clas"
+ *     Sugestao: voce quis dizer "class"?
+ */
 void suggestCorrection(const char* text, int line) {
     std::string input(text);
     std::string bestMatch = "";
@@ -69,8 +120,20 @@ void suggestCorrection(const char* text, int line) {
 
 %}
 
+/* === Opcoes do Flex === */
 %option noyywrap
+    /* noyywrap: nao chama yywrap() ao fim do arquivo (so processa um arquivo) */
 %option yylineno
+    /* yylineno: ativa a variavel automatica yylineno (contador de linhas do Flex) */
+%option nounput
+    /* nounput: nao gera a funcao yyunput (nao usada neste lexer) */
+
+/* === Variaveis automaticas do Flex (referencia rapida) ===
+ *   yytext  (char*) -- texto exato que casou com a regra atual
+ *   yyleng  (int)   -- tamanho de yytext (strlen)
+ *   yyin    (FILE*) -- arquivo de entrada sendo lido
+ *   yylineno (int)  -- contador de linhas automatico
+ */
 
 DIGIT       [0-9]
 LETTER      [a-zA-Z]
@@ -81,20 +144,29 @@ NEWLINE     \n
 
 %%
 
-    /* Comentários (pré-processador integrado) */
-"//".*                          { /* Ignora comentário de linha única */ }
-"/*"([^*]|\*+[^*/])*\*+"/"     { 
-    /* Ignora comentário de múltiplas linhas, conta newlines */
+    /* ================================================================ */
+    /* REGRAS DO LEXER                                                  */
+    /* Formato: padrao { acao }                                         */
+    /* O Flex casa o padrao mais longo possivel (maximal munch).         */
+    /* Em caso de empate no tamanho, a regra que aparece primeiro vence. */
+    /* ================================================================ */
+
+    /* --- Comentarios (pre-processador integrado) --- */
+    /* Descartados sem gerar tokens. */
+"//".*                          { /* Ignora comentario de linha unica */ }
+"/*"([^*]|\*+[^*/])*\*+"/"      { 
+    /* Comentario de multiplas linhas: conta \n internos */
     for (int i = 0; yytext[i]; i++) {
         if (yytext[i] == '\n') lineNumber++;
     }
 }
 
-    /* Espaços em branco */
-{WHITESPACE}    { /* Ignora espaços */ }
+    /* --- Espacos em branco (descartados) --- */
+{WHITESPACE}    { /* Ignora espacos, tabs e \r */ }
 {NEWLINE}       { lineNumber++; }
 
-    /* Palavras-chave */
+    /* --- Palavras-chave --- */
+    /* Aparecem ANTES de {ID} para ter prioridade em caso de empate. */
 "class"         { addToken(TokenType::CLASS, yytext, lineNumber); }
 "public"        { addToken(TokenType::PUBLIC, yytext, lineNumber); }
 "static"        { addToken(TokenType::STATIC, yytext, lineNumber); }
@@ -117,7 +189,8 @@ NEWLINE     \n
 "extends"       { addToken(TokenType::EXTENDS, yytext, lineNumber); }
 "length"        { addToken(TokenType::LENGTH, yytext, lineNumber); }
 
-    /* Operadores */
+    /* --- Operadores --- */
+    /* "&&" vem antes para nao ser lido como dois tokens separados. */
 "&&"            { addToken(TokenType::AND, yytext, lineNumber); }
 "<"             { addToken(TokenType::LT, yytext, lineNumber); }
 ">"             { addToken(TokenType::GT, yytext, lineNumber); }
@@ -127,7 +200,7 @@ NEWLINE     \n
 "="             { addToken(TokenType::ASSIGN, yytext, lineNumber); }
 "!"             { addToken(TokenType::NOT, yytext, lineNumber); }
 
-    /* Delimitadores */
+    /* --- Delimitadores --- */
 "("             { addToken(TokenType::LPAREN, yytext, lineNumber); }
 ")"             { addToken(TokenType::RPAREN, yytext, lineNumber); }
 "["             { addToken(TokenType::LBRACKET, yytext, lineNumber); }
@@ -138,19 +211,23 @@ NEWLINE     \n
 ","             { addToken(TokenType::COMMA, yytext, lineNumber); }
 "."             { addToken(TokenType::DOT, yytext, lineNumber); }
 
-    /* Identificadores */
+    /* --- Identificadores --- */
+    /* Comeca com letra, pode conter letras, digitos e _. */
+    /* So casa aqui se NAO casou com nenhuma keyword acima. */
 {ID}            { addToken(TokenType::ID, yytext, lineNumber); }
 
-    /* Números inteiros */
+    /* --- Numeros inteiros --- */
 {NUMBER}        { addToken(TokenType::NUMBER, yytext, lineNumber); }
 
-    /* Identificadores inválidos (começam com dígito seguido de letras) */
+    /* --- Identificadores invalidos (comecam com digito + letras) --- */
 {DIGIT}+{LETTER}({LETTER}|{DIGIT}|"_")*  {
     suggestCorrection(yytext, lineNumber);
     addToken(TokenType::UNKNOWN, yytext, lineNumber);
 }
 
-    /* Caractere desconhecido */
+    /* --- Caractere desconhecido (fallback) --- */
+    /* O ponto (.) casa com qualquer caractere exceto \n. */
+    /* DEVE ser a ultima regra. */
 .               {
     std::cerr << "Erro léxico na linha " << lineNumber 
               << ": caractere inesperado '" << yytext << "'" << std::endl;

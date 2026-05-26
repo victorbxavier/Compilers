@@ -1,3 +1,20 @@
+/**
+ * @file parser.h
+ * @brief Analisador Sintatico (Parser) do compilador MiniJava.
+ *
+ * Implementa um parser recursivo descendente (recursive descent) para
+ * a gramatica LL(1) da linguagem MiniJava. Cada regra da gramatica
+ * corresponde a uma funcao privada da classe Parser.
+ *
+ * O parser consome a lista de tokens produzida pelo lexer e:
+ *   1. Valida se a sequencia respeita a gramatica
+ *   2. Constroi a tabela de simbolos durante o parsing
+ *   3. Reporta o primeiro erro sintatico encontrado (sem recuperacao)
+ *
+ * Tecnica: lookahead de 1 token (LL(1)) -- usa currentType() para
+ * decidir qual producao seguir em cada ponto da gramatica.
+ */
+
 #ifndef PARSER_H
 #define PARSER_H
 
@@ -10,9 +27,18 @@
 
 class Parser {
 public:
+    /**
+     * @brief Construtor -- recebe a lista de tokens do lexer.
+     * Inicializa o cursor (pos_) no inicio e sem erros.
+     */
     Parser(const std::vector<Token>& tokens) : tokens_(tokens), pos_(0), hadError_(false) {}
 
-    // Ponto de entrada: parseia o programa inteiro
+    /**
+     * @brief Ponto de entrada da analise sintatica.
+     * Chama parseProg() (regra inicial da gramatica) e verifica
+     * se todos os tokens foram consumidos (espera END_OF_FILE).
+     * @return true se o programa e sintaticamente correto
+     */
     bool parse() {
         parseProg();
         if (!hadError_) {
@@ -26,15 +52,16 @@ public:
     const SymbolTable& getSymbolTable() const { return symbolTable_; }
 
 private:
-    std::vector<Token> tokens_;
-    int pos_;
-    bool hadError_;
-    SymbolTable symbolTable_;
-    std::string currentClass_;   // Classe sendo parseada (escopo)
-    std::string currentMethod_;  // Método sendo parseado (escopo)
+    std::vector<Token> tokens_;    // Lista de tokens recebida do lexer
+    int pos_;                      // Cursor -- indice do token atual
+    bool hadError_;                // Flag: true apos o primeiro erro (para a analise)
+    SymbolTable symbolTable_;      // Tabela de simbolos preenchida durante o parsing
+    std::string currentClass_;     // Nome da classe sendo parseada (escopo atual)
+    std::string currentMethod_;    // Nome do metodo sendo parseado (escopo atual)
 
-    // ==================== Funções auxiliares ====================
+    // ==================== Funcoes auxiliares ====================
 
+    // Retorna o token na posicao atual do cursor (lookahead)
     Token currentToken() const {
         if (pos_ < (int)tokens_.size()) {
             return tokens_[pos_];
@@ -46,21 +73,24 @@ private:
         return eof;
     }
 
+    // Alias para currentToken()
     Token peek() const {
         return currentToken();
     }
 
+    // Retorna o tipo do token atual (usado para decisoes de lookahead)
     TokenType currentType() const {
         return currentToken().type;
     }
 
+    // Avanca o cursor para o proximo token
     void advance() {
         if (pos_ < (int)tokens_.size()) {
             pos_++;
         }
     }
 
-    // Consome o token esperado ou reporta erro
+    // Consome o token atual se for do tipo esperado, senao reporta erro
     void match(TokenType expected) {
         if (currentType() == expected) {
             advance();
@@ -69,7 +99,7 @@ private:
         }
     }
 
-    // Consome e retorna o lexema do token
+    // Consome o token esperado e retorna seu lexema (usado para capturar nomes)
     std::string matchAndGet(TokenType expected) {
         if (currentType() == expected) {
             std::string lex = currentToken().lexeme;
@@ -81,7 +111,7 @@ private:
         }
     }
 
-    // Retorna o escopo atual formatado
+    // Retorna o escopo atual formatado (ex: "Factorial.compute")
     std::string currentScope() const {
         if (currentMethod_.empty()) {
             return currentClass_;
@@ -89,7 +119,7 @@ private:
         return currentClass_ + "." + currentMethod_;
     }
 
-    // Reporta erro sintático
+    // Reporta erro sintatico indicando token esperado vs encontrado
     void error(TokenType expected) {
         if (hadError_) return;
         hadError_ = true;
@@ -115,7 +145,7 @@ private:
         std::cerr << ")" << std::endl;
     }
 
-    // Parseia um tipo e retorna sua representação como string
+    // Parseia um tipo (int, int[], boolean, ou Id) e retorna como string
     std::string parseTypeAndGet() {
         if (hadError_) return "";
         if (currentType() == TokenType::INT) {
@@ -141,16 +171,20 @@ private:
         }
     }
 
-    // ==================== Regras da gramática ====================
+    // ==================== Regras da gramatica ====================
+    // Cada funcao abaixo corresponde a uma producao da gramatica LL(1).
+    // O comentario acima de cada funcao mostra a producao formal.
+    // "lambda" indica producao vazia (a funcao simplesmente retorna).
 
-    // Prog → MainC DefCl
+    // Prog -> MainC DefCl
     void parseProg() {
         parseMainC();
         if (hadError_) return;
         parseDefCl();
     }
 
-    // MainC → 'class' Id '{' 'public' 'static' 'void' 'main' '(' 'String' '[' ']' Id ')' '{' CmdList '}' '}'
+    // MainC -> 'class' Id '{' 'public' 'static' 'void' 'main' '(' 'String' '[' ']' Id ')' '{' CmdList '}' '}'
+    // Parseia a classe principal (que contem o metodo main)
     void parseMainC() {
         match(TokenType::CLASS);
         if (hadError_) return;
@@ -202,7 +236,8 @@ private:
         currentClass_ = "";
     }
 
-    // DefCl → 'class' Id DefCl' | λ
+    // DefCl -> 'class' Id DefCl' | lambda
+    // Parseia zero ou mais definicoes de classe apos a classe principal
     void parseDefCl() {
         if (hadError_) return;
         if (currentType() == TokenType::CLASS) {
@@ -221,8 +256,9 @@ private:
         // λ
     }
 
-    // DefCl' → '{' DefVar DefMet '}' DefCl
-    //         | 'extends' Id '{' DefVar DefMet '}' DefCl
+    // DefCl' -> '{' DefVar DefMet '}' DefCl
+    //          | 'extends' Id '{' DefVar DefMet '}' DefCl
+    // Corpo da classe: pode ter heranca (extends) ou nao
     void parseDefClTail() {
         if (hadError_) return;
         if (currentType() == TokenType::LBRACE) {
@@ -254,7 +290,10 @@ private:
         }
     }
 
-    // DefVar → Type Id ';' DefVar | λ
+    // DefVar -> Type Id ';' DefVar | lambda
+    // Parseia declaracoes de variaveis. Usa lookahead para distinguir
+    // declaracao de variavel (Type Id ;) de inicio de metodo ou comando.
+    // O parametro varCategory indica se e variavel de instancia ou local.
     void parseDefVar(SymbolCategory varCategory) {
         if (hadError_) return;
         if (isTypeStart()) {
@@ -348,7 +387,8 @@ private:
         // λ
     }
 
-    // DefMet → 'public' Type Id '(' DefMetArgs ')' '{' DefVar CmdList 'return' Exp ';' '}' DefMet | λ
+    // DefMet -> 'public' Type Id '(' Args ')' '{' DefVar CmdList 'return' Exp ';' '}' DefMet | lambda
+    // Parseia zero ou mais definicoes de metodo dentro de uma classe
     void parseDefMet() {
         if (hadError_) return;
         if (currentType() == TokenType::PUBLIC) {
@@ -391,7 +431,8 @@ private:
         // λ
     }
 
-    // DefMetArgs → Args | λ
+    // DefMetArgs -> Args | lambda
+    // Parseia os parametros formais de um metodo (pode ser vazio)
     void parseDefMetArgs() {
         if (hadError_) return;
         if (isTypeStart()) {
@@ -400,7 +441,7 @@ private:
         // λ
     }
 
-    // Type → 'int' '[' ']' | 'boolean' | 'int' | Id
+    // Type -> 'int' '[' ']' | 'boolean' | 'int' | Id
     void parseType() {
         if (hadError_) return;
         if (currentType() == TokenType::INT) {
@@ -420,7 +461,8 @@ private:
         }
     }
 
-    // Args → Type Id Args'
+    // Args -> Type Id Args'
+    // Parseia lista de parametros e registra cada um na tabela de simbolos
     void parseArgs() {
         if (hadError_) return;
         std::string type = parseTypeAndGet();
@@ -432,7 +474,7 @@ private:
         parseArgsTail();
     }
 
-    // Args' → ',' Args | λ
+    // Args' -> ',' Args | lambda
     void parseArgsTail() {
         if (hadError_) return;
         if (currentType() == TokenType::COMMA) {
@@ -443,11 +485,12 @@ private:
         // λ
     }
 
-    // Cmd → '{' CmdList '}'
-    //      | 'if' '(' Exp ')' Cmd 'else' Cmd
-    //      | 'while' '(' Exp ')' Cmd
-    //      | 'System' '.' 'out' '.' 'println' '(' Exp ')' ';'
-    //      | Id Cmd'
+    // Cmd -> '{' CmdList '}'
+    //       | 'if' '(' Exp ')' Cmd 'else' Cmd
+    //       | 'while' '(' Exp ')' Cmd
+    //       | 'System' '.' 'out' '.' 'println' '(' Exp ')' ';'
+    //       | Id Cmd'
+    // Usa o token atual (lookahead) para decidir qual alternativa seguir
     void parseCmd() {
         if (hadError_) return;
         if (currentType() == TokenType::LBRACE) {
@@ -507,8 +550,8 @@ private:
         }
     }
 
-    // Cmd' → '=' Exp ';'
-    //       | '[' Exp ']' '=' Exp ';'
+    // Cmd' -> '=' Exp ';'           (atribuicao simples)
+    //        | '[' Exp ']' '=' Exp ';'  (atribuicao em array)
     void parseCmdTail() {
         if (hadError_) return;
         if (currentType() == TokenType::ASSIGN) {
@@ -534,7 +577,8 @@ private:
         }
     }
 
-    // CmdList → Cmd CmdList | λ
+    // CmdList -> Cmd CmdList | lambda
+    // Parseia zero ou mais comandos em sequencia
     void parseCmdList() {
         if (hadError_) return;
         if (isCmdStart()) {
@@ -545,7 +589,8 @@ private:
         // λ
     }
 
-    // Exp → PrimExp Exp'
+    // Exp -> PrimExp Exp'
+    // Expressao: uma expressao primaria seguida de operacoes opcionais
     void parseExp() {
         if (hadError_) return;
         parsePrimExp();
@@ -553,10 +598,8 @@ private:
         parseExpTail();
     }
 
-    // Exp' → Op PrimExp Exp'
-    //       | '[' Exp ']' Exp'
-    //       | '.' PostExpDot
-    //       | λ
+    // Exp' -> Op PrimExp Exp' | '[' Exp ']' Exp' | '.' PostExpDot | lambda
+    // Cauda da expressao: operador binario, acesso a array, ou chamada de metodo
     void parseExpTail() {
         if (hadError_) return;
         if (isOp()) {
@@ -581,7 +624,7 @@ private:
         // λ
     }
 
-    // Op → '&&' | '<' | '>' | '+' | '-' | '*'
+    // Op -> '&&' | '<' | '>' | '+' | '-' | '*'
     void parseOp() {
         if (hadError_) return;
         if (currentType() == TokenType::AND || currentType() == TokenType::LT ||
@@ -593,8 +636,8 @@ private:
         }
     }
 
-    // PostExpDot → 'length' Exp'
-    //            | Id '(' ListExp ')' Exp'
+    // PostExpDot -> 'length' Exp' | Id '(' ListExp ')' Exp'
+    // Apos um '.': acesso a .length ou chamada de metodo
     void parsePostExpDot() {
         if (hadError_) return;
         if (currentType() == TokenType::LENGTH) {
@@ -616,7 +659,8 @@ private:
         }
     }
 
-    // ListExp → Exp ListExp' | λ
+    // ListExp -> Exp ListExp' | lambda
+    // Lista de argumentos em chamada de metodo (pode ser vazia)
     void parseListExp() {
         if (hadError_) return;
         if (isPrimExpStart()) {
@@ -627,7 +671,7 @@ private:
         // λ
     }
 
-    // ListExp' → ',' Exp ListExp' | λ
+    // ListExp' -> ',' Exp ListExp' | lambda
     void parseListExpTail() {
         if (hadError_) return;
         if (currentType() == TokenType::COMMA) {
@@ -640,14 +684,9 @@ private:
         // λ
     }
 
-    // PrimExp → 'new' PrimExp'
-    //         | '!' Exp
-    //         | '(' Exp ')'
-    //         | 'true'
-    //         | 'false'
-    //         | Id
-    //         | Number
-    //         | 'this'
+    // PrimExp -> 'new' PrimExp' | '!' Exp | '(' Exp ')'
+    //           | 'true' | 'false' | Id | Number | 'this'
+    // Expressao primaria: o "atomo" de uma expressao
     void parsePrimExp() {
         if (hadError_) return;
         if (currentType() == TokenType::NEW) {
@@ -679,8 +718,8 @@ private:
         }
     }
 
-    // PrimExp' → Id '(' ')'
-    //          | 'int' '[' Exp ']'
+    // PrimExp' -> Id '(' ')'        (instanciacao de objeto: new Classe())
+    //            | 'int' '[' Exp ']'  (criacao de array: new int[size])
     void parsePrimExpTail() {
         if (hadError_) return;
         if (currentType() == TokenType::ID) {
@@ -702,14 +741,18 @@ private:
         }
     }
 
-    // ==================== Funções de verificação (FIRST sets) ====================
+    // ==================== Conjuntos FIRST ====================
+    // Funcoes que verificam se o token atual pertence ao conjunto FIRST
+    // de uma producao. Usadas para decidir qual alternativa seguir.
 
+    // FIRST(Type) = { int, boolean, ID }
     bool isTypeStart() const {
         return currentType() == TokenType::INT ||
                currentType() == TokenType::BOOLEAN ||
                currentType() == TokenType::ID;
     }
 
+    // FIRST(Cmd) = { '{', if, while, System, ID }
     bool isCmdStart() const {
         return currentType() == TokenType::LBRACE ||
                currentType() == TokenType::IF ||
@@ -718,6 +761,7 @@ private:
                currentType() == TokenType::ID;
     }
 
+    // FIRST(Op) = { &&, <, >, +, -, * }
     bool isOp() const {
         return currentType() == TokenType::AND ||
                currentType() == TokenType::LT ||
@@ -727,6 +771,7 @@ private:
                currentType() == TokenType::MULT;
     }
 
+    // FIRST(PrimExp) = { new, !, (, true, false, ID, NUMBER, this }
     bool isPrimExpStart() const {
         return currentType() == TokenType::NEW ||
                currentType() == TokenType::NOT ||
