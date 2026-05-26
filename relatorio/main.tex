@@ -1,0 +1,542 @@
+\documentclass[a4paper, 12pt]{article}
+\usepackage[left=3cm, top=3cm, right=2cm, bottom=2cm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage{graphicx}
+\usepackage{fvextra}
+\pagestyle{myheadings}
+\usepackage{setspace}
+\usepackage{indentfirst}
+\setlength{\parindent}{1cm}
+\usepackage{float}
+\usepackage{amsthm}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{rotating}
+\usepackage{caption}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{upquote}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    frame=single,
+    breaklines=true,
+    tabsize=4,
+    showstringspaces=false,
+    columns=fullflexible,
+    keepspaces=true
+}
+
+\lstdefinestyle{minijava}{
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{gray}\itshape,
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    morekeywords={class, public, static, void, main, String, return, int, boolean, if, else, while, System, out, println, true, false, this, new, extends, length}
+}
+
+\lstdefinestyle{cpp}{
+    language=C++,
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{gray}\itshape,
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny\color{gray}
+}
+
+\begin{document}
+
+\include{0.pretext}
+
+\section{Introdu\c{c}\~ao}
+
+O presente relat\'orio tem como objetivo apresentar a documenta\c{c}\~ao do compilador para a linguagem \textit{MiniJava}, desenvolvido como projeto da disciplina DIM0164 --- Compiladores (2026.1, UFRN). O compilador implementa as fases de an\'alise l\'exica, an\'alise sint\'atica e constru\c{c}\~ao da tabela de s\'imbolos.
+
+A linguagem \textit{MiniJava} \'e um subconjunto da linguagem Java, projetada para fins did\'aticos. O compilador foi implementado em C++ (padr\~ao C++17) utilizando o gerador de analisadores l\'exicos \textit{Flex} e um parser recursivo descendente escrito manualmente para valida\c{c}\~ao da gram\'atica LL(1).
+
+\section{A linguagem MiniJava}
+
+\subsection{Vis\~ao geral}
+
+MiniJava \'e uma linguagem orientada a objetos com tipagem est\'atica. Todo programa MiniJava possui obrigatoriamente uma classe principal com um m\'etodo \texttt{main}, seguida de zero ou mais classes auxiliares.
+
+\subsection{Tipos de dados}
+
+A linguagem suporta os seguintes tipos:
+
+\begin{itemize}
+    \item \texttt{int} --- inteiros;
+    \item \texttt{int[]} --- arrays de inteiros;
+    \item \texttt{boolean} --- valores l\'ogicos (\texttt{true} ou \texttt{false});
+    \item Tipos definidos pelo usu\'ario (nomes de classes).
+\end{itemize}
+
+\subsection{Estrutura de um programa}
+
+Todo programa MiniJava segue esta estrutura:
+
+\begin{lstlisting}[style=minijava, caption={Estrutura b\'asica de um programa MiniJava}]
+class NomePrincipal {
+    public static void main(String[] args) {
+        // comandos do programa principal
+    }
+}
+
+class OutraClasse {
+    // variaveis de instancia
+    int x;
+
+    // metodos
+    public int metodo(int param) {
+        // corpo
+        return valor;
+    }
+}
+\end{lstlisting}
+
+\subsection{Declara\c{c}\~ao de vari\'aveis}
+
+Vari\'aveis s\~ao declaradas com tipo seguido de nome e ponto-e-v\'irgula:
+
+\begin{lstlisting}[style=minijava, caption={Declara\c{c}\~ao de vari\'aveis}]
+int x;
+int[] numeros;
+boolean flag;
+MinhaClasse obj;
+\end{lstlisting}
+
+\subsection{Comandos}
+
+\subsubsection{Atribui\c{c}\~ao}
+
+\begin{lstlisting}[style=minijava, caption={Atribui\c{c}\~oes}]
+x = 10;
+numeros[0] = 42;
+\end{lstlisting}
+
+\subsubsection{Condicional (if/else)}
+
+O \texttt{if} em MiniJava sempre exige um bloco \texttt{else}:
+
+\begin{lstlisting}[style=minijava, caption={Estrutura condicional}]
+if (x < 10)
+    y = 1;
+else
+    y = 2;
+\end{lstlisting}
+
+\subsubsection{La\c{c}o de repeti\c{c}\~ao (while)}
+
+\begin{lstlisting}[style=minijava, caption={La\c{c}o while}]
+while (i < n) {
+    System.out.println(i);
+    i = i + 1;
+}
+\end{lstlisting}
+
+\subsubsection{Impress\~ao}
+
+A \'unica forma de sa\'ida \'e \texttt{System.out.println}, que imprime um inteiro:
+
+\begin{lstlisting}[style=minijava, caption={Impress\~ao de valores}]
+System.out.println(42);
+System.out.println(x + y);
+\end{lstlisting}
+
+\subsection{Express\~oes e operadores}
+
+\subsubsection{Operadores aritm\'eticos}
+
+\begin{itemize}
+    \item \texttt{+} (adi\c{c}\~ao), \texttt{-} (subtra\c{c}\~ao), \texttt{*} (multiplica\c{c}\~ao)
+\end{itemize}
+
+\subsubsection{Operadores de compara\c{c}\~ao e l\'ogicos}
+
+\begin{itemize}
+    \item \texttt{<} (menor que), \texttt{>} (maior que)
+    \item \texttt{\&\&} (E l\'ogico), \texttt{!} (nega\c{c}\~ao)
+\end{itemize}
+
+\subsubsection{Acesso a arrays e m\'etodos}
+
+\begin{lstlisting}[style=minijava, caption={Express\~oes com arrays e m\'etodos}]
+// Acesso a array
+x = numeros[i];
+
+// Tamanho do array
+tam = numeros.length;
+
+// Chamada de metodo
+resultado = obj.metodo(arg1, arg2);
+\end{lstlisting}
+
+\subsection{Classes e heran\c{c}a}
+
+Classes podem herdar de outra classe usando \texttt{extends}:
+
+\begin{lstlisting}[style=minijava, caption={Heran\c{c}a de classes}]
+class Animal {
+    int idade;
+
+    public int getIdade() {
+        return idade;
+    }
+}
+
+class Cachorro extends Animal {
+    int peso;
+
+    public int getPeso() {
+        return peso;
+    }
+}
+\end{lstlisting}
+
+\subsection{Instancia\c{c}\~ao de objetos e arrays}
+
+\begin{lstlisting}[style=minijava, caption={Cria\c{c}\~ao de objetos e arrays}]
+// Novo objeto
+obj = new MinhaClasse();
+
+// Novo array de inteiros com 10 posicoes
+numeros = new int[10];
+\end{lstlisting}
+
+\subsection{Exemplo completo: Fatorial}
+
+\begin{lstlisting}[style=minijava, caption={Programa que calcula o fatorial de 10}]
+class Factorial {
+    public static void main(String[] a) {
+        System.out.println(new Fac().ComputeFac(10));
+    }
+}
+
+class Fac {
+    public int ComputeFac(int num) {
+        int num_aux;
+        if (num < 1)
+            num_aux = 1;
+        else
+            num_aux = num * (this.ComputeFac(num - 1));
+        return num_aux;
+    }
+}
+\end{lstlisting}
+
+Neste exemplo:
+\begin{itemize}
+    \item A classe \texttt{Factorial} cont\'em o \texttt{main}, que instancia \texttt{Fac} e chama \texttt{ComputeFac};
+    \item A classe \texttt{Fac} define um m\'etodo recursivo que calcula o fatorial;
+    \item \texttt{this.ComputeFac(num - 1)} \'e uma chamada recursiva ao pr\'oprio m\'etodo.
+\end{itemize}
+
+\subsection{Coment\'arios}
+
+A linguagem suporta dois estilos de coment\'arios:
+
+\begin{lstlisting}[style=minijava, caption={Coment\'arios}]
+// Comentario de linha unica
+
+/* Comentario de
+   multiplas linhas */
+\end{lstlisting}
+
+\section{\textit{Design} da implementa\c{c}\~ao}
+
+\subsection{Etapas de implementa\c{c}\~ao}
+
+O desenvolvimento do compilador seguiu as seguintes etapas:
+
+\begin{enumerate}
+    \item \textbf{Transforma\c{c}\~ao da gram\'atica para LL(1)}: a gram\'atica original da linguagem MiniJava foi transformada para eliminar recurs\~ao \`a esquerda e fatorar produ\c{c}\~oes amb\'iguas, resultando em uma gram\'atica LL(1) adequada para um parser recursivo descendente;
+    \item \textbf{Implementa\c{c}\~ao do analisador l\'exico}: defini\c{c}\~ao dos tokens e constru\c{c}\~ao do scanner com \textit{Flex};
+    \item \textbf{Implementa\c{c}\~ao do analisador sint\'atico}: constru\c{c}\~ao do parser recursivo descendente a partir da gram\'atica LL(1);
+    \item \textbf{Constru\c{c}\~ao da tabela de s\'imbolos}: integra\c{c}\~ao ao parser para registrar declara\c{c}\~oes durante o parsing.
+\end{enumerate}
+
+\subsection{Transforma\c{c}\~ao para gram\'atica LL(1)}
+
+A gram\'atica original da linguagem MiniJava possui constru\c{c}\~oes que n\~ao s\~ao diretamente compat\'iveis com parsers LL(1), como produ\c{c}\~oes com prefixos comuns. Para resolver isso, foram aplicadas as seguintes t\'ecnicas:
+
+\begin{itemize}
+    \item \textbf{Fatora\c{c}\~ao \`a esquerda}: produ\c{c}\~oes como \texttt{Cmd}, que podem come\c{c}ar com \texttt{Id} tanto para atribui\c{c}\~ao simples quanto para atribui\c{c}\~ao em array, foram fatoradas em \texttt{Cmd} e \texttt{Cmd'};
+    \item \textbf{Elimina\c{c}\~ao de recurs\~ao \`a esquerda}: express\~oes que tinham recurs\~ao \`a esquerda (como opera\c{c}\~oes bin\'arias encadeadas) foram transformadas usando o padr\~ao \texttt{Exp} $\rightarrow$ \texttt{PrimExp Exp'} com \texttt{Exp'} recursivo \`a direita;
+    \item \textbf{Separa\c{c}\~ao de alternativas}: produ\c{c}\~oes como \texttt{DefCl'} separam o caso com heran\c{c}a (\texttt{extends}) do caso sem.
+\end{itemize}
+
+A gram\'atica LL(1) resultante \'e apresentada a seguir:
+
+\begin{lstlisting}[numbers=none, escapeinside={(*}{*)}]
+Prog      (*$\rightarrow$*) MainC DefCl
+
+MainC     (*$\rightarrow$*) 'class' Id '{' 'public' 'static' 'void' 'main'
+            '(' 'String' '[' ']' Id ')' '{' Cmd '}' '}'
+
+DefCl     (*$\rightarrow$*) 'class' Id DefCl' | (*$\lambda$*)
+DefCl'    (*$\rightarrow$*) '{' DefVar DefMet '}' DefCl
+          | 'extends' Id '{' DefVar DefMet '}' DefCl
+
+DefVar    (*$\rightarrow$*) Type Id ';' DefVar | (*$\lambda$*)
+
+DefMet    (*$\rightarrow$*) 'public' Type Id '(' DefMetArgs ')'
+            '{' DefVar Cmd 'return' Exp ';' '}' DefMet | (*$\lambda$*)
+DefMetArgs (*$\rightarrow$*) Args | (*$\lambda$*)
+
+Type      (*$\rightarrow$*) 'int' '[' ']' | 'boolean' | 'int' | Id
+
+Args      (*$\rightarrow$*) Type Id Args'
+Args'     (*$\rightarrow$*) ',' Args | (*$\lambda$*)
+
+Cmd       (*$\rightarrow$*) '{' CmdList '}'
+          | 'if' '(' Exp ')' Cmd 'else' Cmd
+          | 'while' '(' Exp ')' Cmd
+          | 'System' '.' 'out' '.' 'println' '(' Exp ')' ';'
+          | Id Cmd'
+Cmd'      (*$\rightarrow$*) '=' Exp ';'
+          | '[' Exp ']' '=' Exp ';'
+CmdList   (*$\rightarrow$*) Cmd CmdList | (*$\lambda$*)
+
+Exp       (*$\rightarrow$*) PrimExp Exp'
+Exp'      (*$\rightarrow$*) Op PrimExp Exp'
+          | '[' Exp ']' Exp'
+          | '.' PostExpDot
+          | (*$\lambda$*)
+
+Op        (*$\rightarrow$*) '&&' | '<' | '>' | '+' | '-' | '*'
+
+PostExpDot (*$\rightarrow$*) 'length' Exp'
+           | Id '(' ListExp ')' Exp'
+
+ListExp   (*$\rightarrow$*) Exp ListExp' | (*$\lambda$*)
+ListExp'  (*$\rightarrow$*) ',' Exp ListExp' | (*$\lambda$*)
+
+PrimExp   (*$\rightarrow$*) 'new' PrimExp' | '!' Exp | '(' Exp ')'
+          | 'true' | 'false' | Id | Number | 'this'
+PrimExp'  (*$\rightarrow$*) Id '(' ')' | 'int' '[' Exp ']'
+\end{lstlisting}
+
+Esta gram\'atica garante que, para cada n\~ao-terminal, o token atual (lookahead) \'e suficiente para determinar univocamente qual produ\c{c}\~ao aplicar.
+
+\subsection{Estrutura do projeto}
+
+\begin{lstlisting}[numbers=none]
+src/
+  token.h          - Definicao dos tipos de token
+  lexer.l          - Analisador lexico (Flex)
+  parser.h         - Analisador sintatico
+  symbol_table.h   - Tabela de simbolos
+  main.cpp         - Programa principal
+assets/            - Programas de teste (.ling)
+Makefile           - Automacao de build
+\end{lstlisting}
+
+\subsection{Fluxo de compila\c{c}\~ao}
+
+O fluxo de dados entre os m\'odulos segue a seguinte sequ\^encia:
+
+\begin{enumerate}
+    \item O \texttt{main.cpp} abre o arquivo fonte (\texttt{.ling}) e configura o \textit{Flex};
+    \item O \textit{Flex} (\texttt{lexer.l}) percorre o c\'odigo fonte caractere a caractere, gerando uma lista de tokens;
+    \item O \texttt{main.cpp} adiciona um token sentinela \texttt{END\_OF\_FILE} ao final da lista;
+    \item O \texttt{Parser} (\texttt{parser.h}) consome a lista de tokens, valida a gram\'atica e preenche a tabela de s\'imbolos;
+    \item O resultado \'e exibido: sucesso com tabela de s\'imbolos, ou mensagem de erro.
+\end{enumerate}
+
+\section{An\'alise l\'exica}
+
+\subsection{Defini\c{c}\~ao dos tokens}
+
+Os tokens s\~ao definidos no arquivo \texttt{token.h} atrav\'es da enumera\c{c}\~ao \texttt{TokenType}, organizada em 5 categorias:
+
+\begin{itemize}
+    \item \textbf{Palavras-chave} (21 tokens): \texttt{class}, \texttt{public}, \texttt{static}, \texttt{void}, \texttt{main}, \texttt{String}, \texttt{return}, \texttt{int}, \texttt{boolean}, \texttt{if}, \texttt{else}, \texttt{while}, \texttt{System}, \texttt{out}, \texttt{println}, \texttt{true}, \texttt{false}, \texttt{this}, \texttt{new}, \texttt{extends}, \texttt{length};
+
+    \item \textbf{Operadores} (8 tokens): \texttt{\&\&}, \texttt{<}, \texttt{>}, \texttt{+}, \texttt{-}, \texttt{*}, \texttt{=}, \texttt{!};
+
+    \item \textbf{Delimitadores} (9 tokens): \texttt{(}, \texttt{)}, \texttt{[}, \texttt{]}, \texttt{\{}, \texttt{\}}, \texttt{;}, \texttt{,}, \texttt{.};
+
+    \item \textbf{Literais e identificadores}: \texttt{ID} (nomes) e \texttt{NUMBER} (inteiros);
+
+    \item \textbf{Controle}: \texttt{END\_OF\_FILE} e \texttt{UNKNOWN}.
+\end{itemize}
+
+Cada token \'e representado pela estrutura:
+
+\begin{lstlisting}[style=cpp]
+struct Token {
+    TokenType type;     // Categoria do token
+    std::string lexeme; // Texto original no codigo fonte
+    int line;           // Linha onde foi encontrado
+};
+\end{lstlisting}
+
+\subsection{Implementa\c{c}\~ao com Flex}
+
+O analisador l\'exico \'e implementado no arquivo \texttt{lexer.l} utilizando o gerador \textit{Flex}. O \textit{Flex} gera um aut\^omato finito determin\'istico (AFD) a partir de regras de express\~oes regulares.
+
+\subsubsection{Pr\'e-processamento integrado}
+
+O lexer atua simultaneamente como pr\'e-processador, removendo coment\'arios (de linha e de bloco) e espa\c{c}os em branco.
+
+\subsubsection{Regras de reconhecimento}
+
+As defini\c{c}\~oes de express\~oes regulares reutiliz\'aveis s\~ao:
+
+\begin{lstlisting}[numbers=none]
+DIGIT       [0-9]
+LETTER      [a-zA-Z]
+ID          {LETTER}({LETTER}|{DIGIT}|"_")*
+NUMBER      {DIGIT}+
+\end{lstlisting}
+
+A prioridade das regras segue a ordem de apari\c{c}\~ao no arquivo: coment\'arios, whitespace, palavras-chave, operadores, delimitadores, identificadores, n\'umeros e erros.
+
+\subsubsection{Tratamento de erros l\'exicos}
+
+Quando o lexer encontra um token inv\'alido, ele calcula a dist\^ancia de Levenshtein entre o token e todas as palavras-chave. Se a dist\^ancia for menor ou igual a 2, sugere a corre\c{c}\~ao mais prov\'avel:
+
+\begin{lstlisting}[numbers=none]
+Erro lexico na linha 3: token invalido "clas"
+  Sugestao: voce quis dizer "class"?
+\end{lstlisting}
+
+\subsection{Sa\'ida da an\'alise l\'exica}
+
+A lista de tokens pode ser visualizada com a flag \texttt{--tokens}:
+
+\begin{lstlisting}[numbers=none]
+$ ./build/compiler --tokens assets/prog-factorial.ling
+<CLASS, "class", line 1>
+<ID, "Factorial", line 1>
+<LBRACE, "{", line 1>
+<PUBLIC, "public", line 2>
+...
+\end{lstlisting}
+
+\section{An\'alise sint\'atica}
+
+\subsection{M\'etodo utilizado}
+
+O analisador sint\'atico \'e implementado como um \textit{parser} recursivo descendente no arquivo \texttt{parser.h}. Cada regra da gram\'atica LL(1) corresponde a uma fun\c{c}\~ao no c\'odigo. O parser utiliza \textit{lookahead} de 1 token para decidir qual produ\c{c}\~ao seguir.
+
+\subsection{Gram\'atica da linguagem}
+
+A gram\'atica LL(1) completa utilizada pelo parser foi apresentada na Se\c{c}\~ao 3.2. Cada fun\c{c}\~ao do parser corresponde diretamente a uma produ\c{c}\~ao dessa gram\'atica.
+
+\subsection{Conjuntos FIRST}
+
+Para decidir qual produ\c{c}\~ao seguir, o parser verifica os conjuntos FIRST:
+
+\begin{itemize}
+    \item FIRST(Type) = \{ \texttt{int}, \texttt{boolean}, \texttt{ID} \}
+    \item FIRST(Cmd) = \{ \texttt{\{}, \texttt{if}, \texttt{while}, \texttt{System}, \texttt{ID} \}
+    \item FIRST(Op) = \{ \texttt{\&\&}, \texttt{<}, \texttt{>}, \texttt{+}, \texttt{-}, \texttt{*} \}
+    \item FIRST(PrimExp) = \{ \texttt{new}, \texttt{!}, \texttt{(}, \texttt{true}, \texttt{false}, \texttt{ID}, \texttt{NUMBER}, \texttt{this} \}
+\end{itemize}
+
+\subsection{Tratamento de erros sint\'aticos}
+
+Ao encontrar um token inesperado, o parser reporta a linha, o token esperado e o encontrado:
+
+\begin{lstlisting}[numbers=none]
+Erro sintatico na linha 5: esperado SEMICOLON mas encontrou RBRACE
+\end{lstlisting}
+
+\section{Tabela de s\'imbolos}
+
+\subsection{Estrutura}
+
+A tabela de s\'imbolos \'e implementada no arquivo \texttt{symbol\_table.h} como um vetor sequencial. Cada entrada cont\'em:
+
+\begin{itemize}
+    \item \texttt{name} --- nome do identificador;
+    \item \texttt{type} --- tipo associado;
+    \item \texttt{scope} --- escopo de declara\c{c}\~ao;
+    \item \texttt{line} --- linha no c\'odigo fonte;
+    \item \texttt{category} --- classifica\c{c}\~ao (CLASS, METHOD, INSTANCE\_VAR, LOCAL\_VAR, PARAMETER).
+\end{itemize}
+
+\subsection{Preenchimento}
+
+A tabela \'e preenchida durante a an\'alise sint\'atica. Sempre que o parser reconhece uma declara\c{c}\~ao, insere um registro com o escopo apropriado:
+
+\begin{itemize}
+    \item Classe $\rightarrow$ escopo \texttt{global}
+    \item M\'etodo $\rightarrow$ escopo \'e o nome da classe
+    \item Vari\'avel local/par\^ametro $\rightarrow$ escopo \'e \texttt{Classe.metodo}
+\end{itemize}
+
+\subsection{Sa\'ida formatada}
+
+Ao final de uma an\'alise bem-sucedida, a tabela \'e impressa:
+
+\begin{lstlisting}[numbers=none]
+=== Tabela de Simbolos ===
+Nome                Tipo           Escopo              Linha  Categoria
+----------------------------------------------------------------------
+Factorial           class          global              1      classe
+main                void           Factorial           2      metodo
+args                String[]       Factorial.main      2      parametro
+Fac                 class          global              7      classe
+ComputeFac          int            Fac                 9      metodo
+num                 int            Fac.ComputeFac      9      parametro
+num_aux             int            Fac.ComputeFac      10     var. local
+\end{lstlisting}
+
+\section{Compila\c{c}\~ao e execu\c{c}\~ao}
+
+\subsection{Pr\'e-requisitos}
+
+\begin{itemize}
+    \item \texttt{g++} (C++17)
+    \item \texttt{flex}
+    \item \texttt{make}
+\end{itemize}
+
+Instala\c{c}\~ao no Ubuntu/WSL:
+
+\begin{lstlisting}[numbers=none]
+sudo apt install build-essential flex
+\end{lstlisting}
+
+\subsection{Processo de build}
+
+\begin{lstlisting}[numbers=none]
+make all        # Compila o projeto
+make clean      # Remove artefatos de build
+\end{lstlisting}
+
+\subsection{Execu\c{c}\~ao}
+
+\begin{lstlisting}[numbers=none]
+./build/compiler programa.ling            # Analise completa
+./build/compiler --tokens programa.ling   # Apenas tokens
+\end{lstlisting}
+
+\subsection{Sa\'idas poss\'iveis}
+
+\begin{itemize}
+    \item \textbf{Sucesso}: mensagem de confirma\c{c}\~ao seguida da tabela de s\'imbolos;
+    \item \textbf{Erro l\'exico}: mensagem com linha e sugest\~ao de corre\c{c}\~ao;
+    \item \textbf{Erro sint\'atico}: mensagem com linha, token esperado e token encontrado.
+\end{itemize}
+
+\section{Considera\c{c}\~oes finais}
+
+O compilador implementado cobre as tr\^es primeiras fases de um compilador tradicional: an\'alise l\'exica, an\'alise sint\'atica e constru\c{c}\~ao da tabela de s\'imbolos. A integra\c{c}\~ao entre o \textit{Flex} e um parser recursivo descendente manual permite controle total sobre as mensagens de erro e a constru\c{c}\~ao incremental da tabela de s\'imbolos.
+
+Como trabalhos futuros, o compilador pode ser estendido com:
+\begin{itemize}
+    \item An\'alise sem\^antica (verifica\c{c}\~ao de tipos, vari\'aveis n\~ao declaradas);
+    \item Gera\c{c}\~ao de c\'odigo intermedi\'ario;
+    \item Otimiza\c{c}\~ao e gera\c{c}\~ao de c\'odigo alvo.
+\end{itemize}
+
+\end{document}
