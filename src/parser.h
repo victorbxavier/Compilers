@@ -1,135 +1,96 @@
 /**
  * @file parser.h
- * @brief Analisador Sintatico (Parser) do compilador MiniJava.
+ * @brief Analisador Sintático — Parser Recursivo Descendente (Unidade 2).
  *
- * Implementa um parser recursivo descendente (recursive descent) para
- * a gramatica LL(1) da linguagem MiniJava. Cada regra da gramatica
- * corresponde a uma funcao privada da classe Parser.
- *
- * O parser consome a lista de tokens produzida pelo lexer e:
- *   1. Valida se a sequencia respeita a gramatica
- *   2. Constroi a tabela de simbolos durante o parsing
- *   3. Reporta o primeiro erro sintatico encontrado (sem recuperacao)
- *
- * Tecnica: lookahead de 1 token (LL(1)) -- usa currentType() para
- * decidir qual producao seguir em cada ponto da gramatica.
+ * Implementa a gramática LL(1) do professor (valdigleis.site) com:
+ *   - Hierarquia de precedência de operadores (Andexp > Relexp > Addexp > Mulexp > Unexp > Psfexp > Priexp)
+ *   - Construção da AST durante o parsing
+ *   - Preenchimento da tabela de símbolos
  */
 
 #ifndef PARSER_H
 #define PARSER_H
 
 #include "token.h"
+#include "ast.h"
 #include "symbol_table.h"
 #include <vector>
 #include <string>
 #include <iostream>
-#include <sstream>
+#include <memory>
 
 class Parser {
 public:
-    /**
-     * @brief Construtor -- recebe a lista de tokens do lexer.
-     * Inicializa o cursor (pos_) no inicio e sem erros.
-     */
     Parser(const std::vector<Token>& tokens) : tokens_(tokens), pos_(0), hadError_(false) {}
 
     /**
-     * @brief Ponto de entrada da analise sintatica.
-     * Chama parseProg() (regra inicial da gramatica) e verifica
-     * se todos os tokens foram consumidos (espera END_OF_FILE).
-     * @return true se o programa e sintaticamente correto
+     * @brief Executa o parsing e retorna a AST (ou nullptr se falhou).
      */
-    bool parse() {
-        parseProg();
-        if (!hadError_) {
-            match(TokenType::END_OF_FILE);
-        }
-        return !hadError_;
+    std::unique_ptr<Program> parse() {
+        auto prog = parseProg();
+        if (!hadError_) match(TokenType::END_OF_FILE);
+        if (hadError_) return nullptr;
+        return prog;
     }
 
     bool hadError() const { return hadError_; }
-
     const SymbolTable& getSymbolTable() const { return symbolTable_; }
 
 private:
-    std::vector<Token> tokens_;    // Lista de tokens recebida do lexer
-    int pos_;                      // Cursor -- indice do token atual
-    bool hadError_;                // Flag: true apos o primeiro erro (para a analise)
-    SymbolTable symbolTable_;      // Tabela de simbolos preenchida durante o parsing
-    std::string currentClass_;     // Nome da classe sendo parseada (escopo atual)
-    std::string currentMethod_;    // Nome do metodo sendo parseado (escopo atual)
+    std::vector<Token> tokens_;
+    int pos_;
+    bool hadError_;
+    SymbolTable symbolTable_;
+    std::string currentClass_;
+    std::string currentMethod_;
 
-    // ==================== Funcoes auxiliares ====================
+    // ==================== Funções auxiliares ====================
 
-    // Retorna o token na posicao atual do cursor (lookahead)
     Token currentToken() const {
-        if (pos_ < (int)tokens_.size()) {
-            return tokens_[pos_];
-        }
-        Token eof;
-        eof.type = TokenType::END_OF_FILE;
-        eof.lexeme = "$";
-        eof.line = tokens_.back().line;
+        if (pos_ < (int)tokens_.size()) return tokens_[pos_];
+        Token eof; eof.type = TokenType::END_OF_FILE; eof.lexeme = "$";
+        eof.line = tokens_.back().line; eof.column = 0;
         return eof;
     }
 
-    // Alias para currentToken()
-    Token peek() const {
-        return currentToken();
-    }
+    Token peek() const { return currentToken(); }
+    TokenType currentType() const { return currentToken().type; }
 
-    // Retorna o tipo do token atual (usado para decisoes de lookahead)
-    TokenType currentType() const {
-        return currentToken().type;
-    }
-
-    // Avanca o cursor para o proximo token
     void advance() {
-        if (pos_ < (int)tokens_.size()) {
-            pos_++;
-        }
+        if (pos_ < (int)tokens_.size()) pos_++;
     }
 
-    // Consome o token atual se for do tipo esperado, senao reporta erro
     void match(TokenType expected) {
-        if (currentType() == expected) {
-            advance();
-        } else {
-            error(expected);
-        }
+        if (hadError_) return;
+        if (currentType() == expected) { advance(); }
+        else { error(expected); }
     }
 
-    // Consome o token esperado e retorna seu lexema (usado para capturar nomes)
     std::string matchAndGet(TokenType expected) {
+        if (hadError_) return "";
         if (currentType() == expected) {
             std::string lex = currentToken().lexeme;
-            advance();
-            return lex;
-        } else {
-            error(expected);
-            return "";
+            advance(); return lex;
         }
+        error(expected); return "";
     }
 
-    // Retorna o escopo atual formatado (ex: "Factorial.compute")
+    int currentLine() const { return currentToken().line; }
+
     std::string currentScope() const {
-        if (currentMethod_.empty()) {
-            return currentClass_;
-        }
+        if (currentMethod_.empty()) return currentClass_;
         return currentClass_ + "." + currentMethod_;
     }
 
-    // Reporta erro sintatico indicando token esperado vs encontrado
     void error(TokenType expected) {
         if (hadError_) return;
         hadError_ = true;
         Token tok = currentToken();
-        std::cerr << "Erro sintático na linha " << tok.line << ": "
-                  << "esperado " << tokenTypeToString(expected)
+        std::cerr << "Erro sintático na linha " << tok.line << ":" << tok.column
+                  << ": esperado " << tokenTypeToString(expected)
                   << " mas encontrou " << tokenTypeToString(tok.type);
-        if (tok.type == TokenType::ID || tok.type == TokenType::NUMBER) {
+        if (tok.type == TokenType::ID || tok.type == TokenType::NUMBER)
             std::cerr << " (\"" << tok.lexeme << "\")";
-        }
         std::cerr << std::endl;
     }
 
@@ -137,168 +98,126 @@ private:
         if (hadError_) return;
         hadError_ = true;
         Token tok = currentToken();
-        std::cerr << "Erro sintático na linha " << tok.line << ": " << msg;
+        std::cerr << "Erro sintático na linha " << tok.line << ":" << tok.column
+                  << ": " << msg;
         std::cerr << " (encontrou " << tokenTypeToString(tok.type);
-        if (tok.type == TokenType::ID || tok.type == TokenType::NUMBER) {
+        if (tok.type == TokenType::ID || tok.type == TokenType::NUMBER)
             std::cerr << " \"" << tok.lexeme << "\"";
-        }
         std::cerr << ")" << std::endl;
     }
 
-    // Parseia um tipo (int, int[], boolean, ou Id) e retorna como string
-    std::string parseTypeAndGet() {
-        if (hadError_) return "";
+    // ==================== Parsing de tipos ====================
+
+    std::unique_ptr<Type> parseType() {
+        if (hadError_) return nullptr;
         if (currentType() == TokenType::INT) {
             match(TokenType::INT);
-            if (hadError_) return "";
+            if (hadError_) return nullptr;
             if (currentType() == TokenType::LBRACKET) {
                 match(TokenType::LBRACKET);
-                if (hadError_) return "";
+                if (hadError_) return nullptr;
                 match(TokenType::RBRACKET);
-                return "int[]";
+                return std::make_unique<IntArrayType>();
             }
-            return "int";
+            return std::make_unique<IntType>();
         } else if (currentType() == TokenType::BOOLEAN) {
             match(TokenType::BOOLEAN);
-            return "boolean";
+            return std::make_unique<BoolType>();
         } else if (currentType() == TokenType::ID) {
-            std::string typeName = currentToken().lexeme;
-            match(TokenType::ID);
-            return typeName;
-        } else {
-            error("esperado um tipo (int, boolean, int[] ou identificador)");
-            return "";
+            std::string name = matchAndGet(TokenType::ID);
+            return std::make_unique<IdentifierType>(name);
         }
+        error("esperado um tipo (int, boolean, int[] ou identificador)");
+        return nullptr;
     }
 
-    // ==================== Regras da gramatica ====================
-    // Cada funcao abaixo corresponde a uma producao da gramatica LL(1).
-    // O comentario acima de cada funcao mostra a producao formal.
-    // "lambda" indica producao vazia (a funcao simplesmente retorna).
-
-    // Prog -> MainC DefCl
-    void parseProg() {
-        parseMainC();
-        if (hadError_) return;
-        parseDefCl();
+    std::string parseTypeString() {
+        if (hadError_) return "";
+        auto t = parseType();
+        if (!t) return "";
+        return typeToString(t.get());
     }
 
-    // MainC -> 'class' Id '{' 'public' 'static' 'void' 'main' '(' 'String' '[' ']' Id ')' '{' CmdList '}' '}'
-    // Parseia a classe principal (que contem o metodo main)
-    void parseMainC() {
-        match(TokenType::CLASS);
-        if (hadError_) return;
+    // ==================== Prog → MainC DefCl ====================
 
-        std::string className = matchAndGet(TokenType::ID);
-        if (hadError_) return;
+    std::unique_ptr<Program> parseProg() {
+        auto mc = parseMainC();
+        if (hadError_) return nullptr;
+        auto classes = parseDefCl();
+        if (hadError_) return nullptr;
+        return std::make_unique<Program>(std::move(mc), std::move(classes));
+    }
+
+    // MainC → 'class' Id '{' 'public' 'static' 'void' 'main' '(' 'String' '[' ']' Id ')' '{' Lcom '}' '}'
+    std::unique_ptr<MainClass> parseMainC() {
+        match(TokenType::CLASS); if (hadError_) return nullptr;
+        std::string className = matchAndGet(TokenType::ID); if (hadError_) return nullptr;
         int classLine = tokens_[pos_ - 1].line;
         currentClass_ = className;
         symbolTable_.addSymbol(className, "class", "global", classLine, SymbolCategory::CLASS);
 
-        match(TokenType::LBRACE);
-        if (hadError_) return;
-        match(TokenType::PUBLIC);
-        if (hadError_) return;
-        match(TokenType::STATIC);
-        if (hadError_) return;
-        match(TokenType::VOID);
-        if (hadError_) return;
-        match(TokenType::MAIN);
-        if (hadError_) return;
-
+        match(TokenType::LBRACE); if (hadError_) return nullptr;
+        match(TokenType::PUBLIC); if (hadError_) return nullptr;
+        match(TokenType::STATIC); if (hadError_) return nullptr;
+        match(TokenType::VOID); if (hadError_) return nullptr;
+        match(TokenType::MAIN); if (hadError_) return nullptr;
         currentMethod_ = "main";
-        symbolTable_.addSymbol("main", "void", currentClass_, tokens_[pos_ - 1].line, SymbolCategory::METHOD);
+        symbolTable_.addSymbol("main", "void", currentClass_, tokens_[pos_-1].line, SymbolCategory::METHOD);
 
-        match(TokenType::LPAREN);
-        if (hadError_) return;
-        match(TokenType::STRING);
-        if (hadError_) return;
-        match(TokenType::LBRACKET);
-        if (hadError_) return;
-        match(TokenType::RBRACKET);
-        if (hadError_) return;
+        match(TokenType::LPAREN); if (hadError_) return nullptr;
+        match(TokenType::STRING); if (hadError_) return nullptr;
+        match(TokenType::LBRACKET); if (hadError_) return nullptr;
+        match(TokenType::RBRACKET); if (hadError_) return nullptr;
+        std::string argsName = matchAndGet(TokenType::ID); if (hadError_) return nullptr;
+        symbolTable_.addSymbol(argsName, "String[]", currentScope(), tokens_[pos_-1].line, SymbolCategory::PARAMETER);
+        match(TokenType::RPAREN); if (hadError_) return nullptr;
+        match(TokenType::LBRACE); if (hadError_) return nullptr;
 
-        std::string paramName = matchAndGet(TokenType::ID);
-        if (hadError_) return;
-        symbolTable_.addSymbol(paramName, "String[]", currentScope(), tokens_[pos_ - 1].line, SymbolCategory::PARAMETER);
-
-        match(TokenType::RPAREN);
-        if (hadError_) return;
-        match(TokenType::LBRACE);
-        if (hadError_) return;
-        parseCmdList();
-        if (hadError_) return;
-        match(TokenType::RBRACE);
-        if (hadError_) return;
-        match(TokenType::RBRACE);
-
+        auto body = parseLcom();
+        if (hadError_) return nullptr;
+        match(TokenType::RBRACE); if (hadError_) return nullptr;
+        match(TokenType::RBRACE); if (hadError_) return nullptr;
         currentMethod_ = "";
         currentClass_ = "";
+        return std::make_unique<MainClass>(className, argsName, std::move(body));
     }
 
-    // DefCl -> 'class' Id DefCl' | lambda
-    // Parseia zero ou mais definicoes de classe apos a classe principal
-    void parseDefCl() {
-        if (hadError_) return;
-        if (currentType() == TokenType::CLASS) {
-            match(TokenType::CLASS);
-            if (hadError_) return;
-
-            std::string className = matchAndGet(TokenType::ID);
-            if (hadError_) return;
+    // DefCl → 'class' Id DefCl' | λ
+    std::vector<std::unique_ptr<ClassDecl>> parseDefCl() {
+        std::vector<std::unique_ptr<ClassDecl>> classes;
+        while (!hadError_ && currentType() == TokenType::CLASS) {
+            match(TokenType::CLASS); if (hadError_) break;
+            std::string className = matchAndGet(TokenType::ID); if (hadError_) break;
             int classLine = tokens_[pos_ - 1].line;
             currentClass_ = className;
             symbolTable_.addSymbol(className, "class", "global", classLine, SymbolCategory::CLASS);
 
-            parseDefClTail();
+            std::string parent = "";
+            if (currentType() == TokenType::EXTENDS) {
+                match(TokenType::EXTENDS); if (hadError_) break;
+                parent = matchAndGet(TokenType::ID); if (hadError_) break;
+            }
+            match(TokenType::LBRACE); if (hadError_) break;
+            auto vars = parseDefV(SymbolCategory::INSTANCE_VAR);
+            if (hadError_) break;
+            auto methods = parseDefM();
+            if (hadError_) break;
+            match(TokenType::RBRACE); if (hadError_) break;
+
+            classes.push_back(std::make_unique<ClassDecl>(className, parent, std::move(vars), std::move(methods)));
             currentClass_ = "";
         }
-        // λ
+        return classes;
     }
 
-    // DefCl' -> '{' DefVar DefMet '}' DefCl
-    //          | 'extends' Id '{' DefVar DefMet '}' DefCl
-    // Corpo da classe: pode ter heranca (extends) ou nao
-    void parseDefClTail() {
-        if (hadError_) return;
-        if (currentType() == TokenType::LBRACE) {
-            match(TokenType::LBRACE);
-            if (hadError_) return;
-            parseDefVar(SymbolCategory::INSTANCE_VAR);
-            if (hadError_) return;
-            parseDefMet();
-            if (hadError_) return;
-            match(TokenType::RBRACE);
-            if (hadError_) return;
-            parseDefCl();
-        } else if (currentType() == TokenType::EXTENDS) {
-            match(TokenType::EXTENDS);
-            if (hadError_) return;
-            match(TokenType::ID);
-            if (hadError_) return;
-            match(TokenType::LBRACE);
-            if (hadError_) return;
-            parseDefVar(SymbolCategory::INSTANCE_VAR);
-            if (hadError_) return;
-            parseDefMet();
-            if (hadError_) return;
-            match(TokenType::RBRACE);
-            if (hadError_) return;
-            parseDefCl();
-        } else {
-            error("esperado '{' ou 'extends' após nome da classe");
-        }
-    }
+    // ==================== DefV → Type Id ';' DefV | λ ====================
 
-    // DefVar -> Type Id ';' DefVar | lambda
-    // Parseia declaracoes de variaveis. Usa lookahead para distinguir
-    // declaracao de variavel (Type Id ;) de inicio de metodo ou comando.
-    // O parametro varCategory indica se e variavel de instancia ou local.
-    void parseDefVar(SymbolCategory varCategory) {
-        if (hadError_) return;
-        if (isTypeStart()) {
+    std::vector<std::unique_ptr<VarDecl>> parseDefV(SymbolCategory varCat) {
+        std::vector<std::unique_ptr<VarDecl>> vars;
+        while (!hadError_ && isTypeStart()) {
+            // Lookahead: se é Type Id ';' então é declaração de variável
             int savedPos = pos_;
-            bool savedError = hadError_;
+            bool isVarDecl = false;
 
             if (currentType() == TokenType::INT) {
                 advance();
@@ -306,472 +225,402 @@ private:
                     advance();
                     if (currentType() == TokenType::RBRACKET) {
                         advance();
-                        if (currentType() == TokenType::ID) {
-                            advance();
-                            if (currentType() == TokenType::SEMICOLON) {
-                                pos_ = savedPos;
-                                hadError_ = savedError;
-                                std::string type = parseTypeAndGet();
-                                if (hadError_) return;
-                                std::string name = matchAndGet(TokenType::ID);
-                                if (hadError_) return;
-                                int line = tokens_[pos_ - 1].line;
-                                symbolTable_.addSymbol(name, type, currentScope(), line, varCategory);
-                                match(TokenType::SEMICOLON);
-                                if (hadError_) return;
-                                parseDefVar(varCategory);
-                                return;
-                            }
-                        }
+                        if (currentType() == TokenType::ID) { advance(); isVarDecl = (currentType() == TokenType::SEMICOLON); }
                     }
                 } else if (currentType() == TokenType::ID) {
-                    advance();
-                    if (currentType() == TokenType::SEMICOLON) {
-                        pos_ = savedPos;
-                        hadError_ = savedError;
-                        std::string type = parseTypeAndGet();
-                        if (hadError_) return;
-                        std::string name = matchAndGet(TokenType::ID);
-                        if (hadError_) return;
-                        int line = tokens_[pos_ - 1].line;
-                        symbolTable_.addSymbol(name, type, currentScope(), line, varCategory);
-                        match(TokenType::SEMICOLON);
-                        if (hadError_) return;
-                        parseDefVar(varCategory);
-                        return;
-                    }
+                    advance(); isVarDecl = (currentType() == TokenType::SEMICOLON);
                 }
             } else if (currentType() == TokenType::BOOLEAN) {
                 advance();
-                if (currentType() == TokenType::ID) {
-                    advance();
-                    if (currentType() == TokenType::SEMICOLON) {
-                        pos_ = savedPos;
-                        hadError_ = savedError;
-                        std::string type = parseTypeAndGet();
-                        if (hadError_) return;
-                        std::string name = matchAndGet(TokenType::ID);
-                        if (hadError_) return;
-                        int line = tokens_[pos_ - 1].line;
-                        symbolTable_.addSymbol(name, type, currentScope(), line, varCategory);
-                        match(TokenType::SEMICOLON);
-                        if (hadError_) return;
-                        parseDefVar(varCategory);
-                        return;
-                    }
-                }
+                if (currentType() == TokenType::ID) { advance(); isVarDecl = (currentType() == TokenType::SEMICOLON); }
             } else if (currentType() == TokenType::ID) {
                 advance();
-                if (currentType() == TokenType::ID) {
-                    advance();
-                    if (currentType() == TokenType::SEMICOLON) {
-                        pos_ = savedPos;
-                        hadError_ = savedError;
-                        std::string type = parseTypeAndGet();
-                        if (hadError_) return;
-                        std::string name = matchAndGet(TokenType::ID);
-                        if (hadError_) return;
-                        int line = tokens_[pos_ - 1].line;
-                        symbolTable_.addSymbol(name, type, currentScope(), line, varCategory);
-                        match(TokenType::SEMICOLON);
-                        if (hadError_) return;
-                        parseDefVar(varCategory);
-                        return;
-                    }
-                }
+                if (currentType() == TokenType::ID) { advance(); isVarDecl = (currentType() == TokenType::SEMICOLON); }
             }
 
             pos_ = savedPos;
-            hadError_ = savedError;
+            if (!isVarDecl) break;
+
+            auto type = parseType(); if (hadError_) break;
+            std::string typeName = typeToString(type.get());
+            std::string name = matchAndGet(TokenType::ID); if (hadError_) break;
+            int ln = tokens_[pos_ - 1].line;
+            symbolTable_.addSymbol(name, typeName, currentScope(), ln, varCat);
+            match(TokenType::SEMICOLON); if (hadError_) break;
+            vars.push_back(std::make_unique<VarDecl>(std::move(type), name));
         }
-        // λ
+        return vars;
     }
 
-    // DefMet -> 'public' Type Id '(' Args ')' '{' DefVar CmdList 'return' Exp ';' '}' DefMet | lambda
-    // Parseia zero ou mais definicoes de metodo dentro de uma classe
-    void parseDefMet() {
-        if (hadError_) return;
-        if (currentType() == TokenType::PUBLIC) {
-            match(TokenType::PUBLIC);
-            if (hadError_) return;
+    // ==================== DefM → 'public' Type Id '(' DefM' | λ ====================
 
-            std::string retType = parseTypeAndGet();
-            if (hadError_) return;
-
-            std::string methodName = matchAndGet(TokenType::ID);
-            if (hadError_) return;
+    std::vector<std::unique_ptr<MethodDecl>> parseDefM() {
+        std::vector<std::unique_ptr<MethodDecl>> methods;
+        while (!hadError_ && currentType() == TokenType::PUBLIC) {
+            match(TokenType::PUBLIC); if (hadError_) break;
+            auto retType = parseType(); if (hadError_) break;
+            std::string retTypeName = typeToString(retType.get());
+            std::string methodName = matchAndGet(TokenType::ID); if (hadError_) break;
             int methodLine = tokens_[pos_ - 1].line;
             currentMethod_ = methodName;
-            symbolTable_.addSymbol(methodName, retType, currentClass_, methodLine, SymbolCategory::METHOD);
+            symbolTable_.addSymbol(methodName, retTypeName, currentClass_, methodLine, SymbolCategory::METHOD);
+            match(TokenType::LPAREN); if (hadError_) break;
 
-            match(TokenType::LPAREN);
-            if (hadError_) return;
-            parseDefMetArgs();
-            if (hadError_) return;
-            match(TokenType::RPAREN);
-            if (hadError_) return;
-            match(TokenType::LBRACE);
-            if (hadError_) return;
-            parseDefVar(SymbolCategory::LOCAL_VAR);
-            if (hadError_) return;
-            parseCmdList();
-            if (hadError_) return;
-            match(TokenType::RETURN);
-            if (hadError_) return;
-            parseExp();
-            if (hadError_) return;
-            match(TokenType::SEMICOLON);
-            if (hadError_) return;
-            match(TokenType::RBRACE);
-            if (hadError_) return;
-
-            currentMethod_ = "";
-            parseDefMet();
-        }
-        // λ
-    }
-
-    // DefMetArgs -> Args | lambda
-    // Parseia os parametros formais de um metodo (pode ser vazio)
-    void parseDefMetArgs() {
-        if (hadError_) return;
-        if (isTypeStart()) {
-            parseArgs();
-        }
-        // λ
-    }
-
-    // Type -> 'int' '[' ']' | 'boolean' | 'int' | Id
-    void parseType() {
-        if (hadError_) return;
-        if (currentType() == TokenType::INT) {
-            match(TokenType::INT);
-            if (hadError_) return;
-            if (currentType() == TokenType::LBRACKET) {
-                match(TokenType::LBRACKET);
-                if (hadError_) return;
-                match(TokenType::RBRACKET);
+            // DefM' → Args ')' { DefV Lcom return Exp ; } DefM | ')' { ... }
+            std::vector<std::unique_ptr<Formal>> params;
+            if (currentType() != TokenType::RPAREN) {
+                params = parseArgs();
+                if (hadError_) break;
             }
-        } else if (currentType() == TokenType::BOOLEAN) {
-            match(TokenType::BOOLEAN);
-        } else if (currentType() == TokenType::ID) {
-            match(TokenType::ID);
-        } else {
-            error("esperado um tipo (int, boolean, int[] ou identificador)");
+            match(TokenType::RPAREN); if (hadError_) break;
+            match(TokenType::LBRACE); if (hadError_) break;
+            auto locals = parseDefV(SymbolCategory::LOCAL_VAR);
+            if (hadError_) break;
+            auto body = parseLcom();
+            if (hadError_) break;
+            match(TokenType::RETURN); if (hadError_) break;
+            auto retExp = parseExp();
+            if (hadError_) break;
+            match(TokenType::SEMICOLON); if (hadError_) break;
+            match(TokenType::RBRACE); if (hadError_) break;
+
+            methods.push_back(std::make_unique<MethodDecl>(
+                std::move(retType), methodName, std::move(params),
+                std::move(locals), std::move(body), std::move(retExp)));
+            currentMethod_ = "";
         }
+        return methods;
     }
 
-    // Args -> Type Id Args'
-    // Parseia lista de parametros e registra cada um na tabela de simbolos
-    void parseArgs() {
-        if (hadError_) return;
-        std::string type = parseTypeAndGet();
-        if (hadError_) return;
-        std::string name = matchAndGet(TokenType::ID);
-        if (hadError_) return;
-        int line = tokens_[pos_ - 1].line;
-        symbolTable_.addSymbol(name, type, currentScope(), line, SymbolCategory::PARAMETER);
-        parseArgsTail();
-    }
+    // ==================== Args → Type Id Args' ====================
 
-    // Args' -> ',' Args | lambda
-    void parseArgsTail() {
-        if (hadError_) return;
-        if (currentType() == TokenType::COMMA) {
-            match(TokenType::COMMA);
-            if (hadError_) return;
-            parseArgs();
+    std::vector<std::unique_ptr<Formal>> parseArgs() {
+        std::vector<std::unique_ptr<Formal>> params;
+        if (hadError_) return params;
+
+        auto type = parseType(); if (hadError_) return params;
+        std::string typeName = typeToString(type.get());
+        std::string name = matchAndGet(TokenType::ID); if (hadError_) return params;
+        int ln = tokens_[pos_ - 1].line;
+        symbolTable_.addSymbol(name, typeName, currentScope(), ln, SymbolCategory::PARAMETER);
+        params.push_back(std::make_unique<Formal>(std::move(type), name));
+
+        // Args' → ',' Type Id Args' | λ
+        while (!hadError_ && currentType() == TokenType::COMMA) {
+            match(TokenType::COMMA); if (hadError_) break;
+            auto t2 = parseType(); if (hadError_) break;
+            std::string t2Name = typeToString(t2.get());
+            std::string n2 = matchAndGet(TokenType::ID); if (hadError_) break;
+            int ln2 = tokens_[pos_ - 1].line;
+            symbolTable_.addSymbol(n2, t2Name, currentScope(), ln2, SymbolCategory::PARAMETER);
+            params.push_back(std::make_unique<Formal>(std::move(t2), n2));
         }
-        // λ
+        return params;
     }
 
-    // Cmd -> '{' CmdList '}'
-    //       | 'if' '(' Exp ')' Cmd 'else' Cmd
-    //       | 'while' '(' Exp ')' Cmd
-    //       | 'System' '.' 'out' '.' 'println' '(' Exp ')' ';'
-    //       | Id Cmd'
-    // Usa o token atual (lookahead) para decidir qual alternativa seguir
-    void parseCmd() {
-        if (hadError_) return;
-        if (currentType() == TokenType::LBRACE) {
-            match(TokenType::LBRACE);
-            if (hadError_) return;
-            parseCmdList();
-            if (hadError_) return;
-            match(TokenType::RBRACE);
-        } else if (currentType() == TokenType::IF) {
-            match(TokenType::IF);
-            if (hadError_) return;
-            match(TokenType::LPAREN);
-            if (hadError_) return;
-            parseExp();
-            if (hadError_) return;
-            match(TokenType::RPAREN);
-            if (hadError_) return;
-            parseCmd();
-            if (hadError_) return;
-            match(TokenType::ELSE);
-            if (hadError_) return;
-            parseCmd();
-        } else if (currentType() == TokenType::WHILE) {
-            match(TokenType::WHILE);
-            if (hadError_) return;
-            match(TokenType::LPAREN);
-            if (hadError_) return;
-            parseExp();
-            if (hadError_) return;
-            match(TokenType::RPAREN);
-            if (hadError_) return;
-            parseCmd();
-        } else if (currentType() == TokenType::SYSTEM) {
-            match(TokenType::SYSTEM);
-            if (hadError_) return;
-            match(TokenType::DOT);
-            if (hadError_) return;
-            match(TokenType::OUT);
-            if (hadError_) return;
-            match(TokenType::DOT);
-            if (hadError_) return;
-            match(TokenType::PRINTLN);
-            if (hadError_) return;
-            match(TokenType::LPAREN);
-            if (hadError_) return;
-            parseExp();
-            if (hadError_) return;
-            match(TokenType::RPAREN);
-            if (hadError_) return;
-            match(TokenType::SEMICOLON);
-        } else if (currentType() == TokenType::ID) {
-            match(TokenType::ID);
-            if (hadError_) return;
-            parseCmdTail();
-        } else {
-            error("esperado um comando ('{', 'if', 'while', 'System' ou identificador)");
+    // ==================== Lcom → Com Lcom' ====================
+    // Lcom' → Com Lcom' | λ
+
+    std::vector<std::unique_ptr<Stmt>> parseLcom() {
+        std::vector<std::unique_ptr<Stmt>> stmts;
+        if (hadError_) return stmts;
+        if (!isCmdStart()) return stmts;  // Lcom pode ser vazio se não há comandos
+
+        auto first = parseCom();
+        if (hadError_) return stmts;
+        if (first) stmts.push_back(std::move(first));
+
+        // Lcom'
+        while (!hadError_ && isCmdStart()) {
+            auto s = parseCom();
+            if (hadError_) break;
+            if (s) stmts.push_back(std::move(s));
         }
+        return stmts;
     }
 
-    // Cmd' -> '=' Exp ';'           (atribuicao simples)
-    //        | '[' Exp ']' '=' Exp ';'  (atribuicao em array)
-    void parseCmdTail() {
-        if (hadError_) return;
-        if (currentType() == TokenType::ASSIGN) {
-            match(TokenType::ASSIGN);
-            if (hadError_) return;
-            parseExp();
-            if (hadError_) return;
-            match(TokenType::SEMICOLON);
-        } else if (currentType() == TokenType::LBRACKET) {
-            match(TokenType::LBRACKET);
-            if (hadError_) return;
-            parseExp();
-            if (hadError_) return;
-            match(TokenType::RBRACKET);
-            if (hadError_) return;
-            match(TokenType::ASSIGN);
-            if (hadError_) return;
-            parseExp();
-            if (hadError_) return;
-            match(TokenType::SEMICOLON);
-        } else {
-            error("esperado '=' ou '[' após identificador em comando");
-        }
-    }
+    // ==================== Com ====================
+    // Com → Id ComAss | if ( Exp ) { Lcom } I | while ( Exp ) { Lcom } | System.out.println( Exp ) ;
 
-    // CmdList -> Cmd CmdList | lambda
-    // Parseia zero ou mais comandos em sequencia
-    void parseCmdList() {
-        if (hadError_) return;
-        if (isCmdStart()) {
-            parseCmd();
-            if (hadError_) return;
-            parseCmdList();
-        }
-        // λ
-    }
+    std::unique_ptr<Stmt> parseCom() {
+        if (hadError_) return nullptr;
 
-    // Exp -> PrimExp Exp'
-    // Expressao: uma expressao primaria seguida de operacoes opcionais
-    void parseExp() {
-        if (hadError_) return;
-        parsePrimExp();
-        if (hadError_) return;
-        parseExpTail();
-    }
-
-    // Exp' -> Op PrimExp Exp' | '[' Exp ']' Exp' | '.' PostExpDot | lambda
-    // Cauda da expressao: operador binario, acesso a array, ou chamada de metodo
-    void parseExpTail() {
-        if (hadError_) return;
-        if (isOp()) {
-            parseOp();
-            if (hadError_) return;
-            parsePrimExp();
-            if (hadError_) return;
-            parseExpTail();
-        } else if (currentType() == TokenType::LBRACKET) {
-            match(TokenType::LBRACKET);
-            if (hadError_) return;
-            parseExp();
-            if (hadError_) return;
-            match(TokenType::RBRACKET);
-            if (hadError_) return;
-            parseExpTail();
-        } else if (currentType() == TokenType::DOT) {
-            match(TokenType::DOT);
-            if (hadError_) return;
-            parsePostExpDot();
-        }
-        // λ
-    }
-
-    // Op -> '&&' | '<' | '>' | '+' | '-' | '*'
-    void parseOp() {
-        if (hadError_) return;
-        if (currentType() == TokenType::AND || currentType() == TokenType::LT ||
-            currentType() == TokenType::GT || currentType() == TokenType::PLUS ||
-            currentType() == TokenType::MINUS || currentType() == TokenType::MULT) {
-            advance();
-        } else {
-            error("esperado um operador (&&, <, >, +, -, *)");
-        }
-    }
-
-    // PostExpDot -> 'length' Exp' | Id '(' ListExp ')' Exp'
-    // Apos um '.': acesso a .length ou chamada de metodo
-    void parsePostExpDot() {
-        if (hadError_) return;
-        if (currentType() == TokenType::LENGTH) {
-            match(TokenType::LENGTH);
-            if (hadError_) return;
-            parseExpTail();
-        } else if (currentType() == TokenType::ID) {
-            match(TokenType::ID);
-            if (hadError_) return;
-            match(TokenType::LPAREN);
-            if (hadError_) return;
-            parseListExp();
-            if (hadError_) return;
-            match(TokenType::RPAREN);
-            if (hadError_) return;
-            parseExpTail();
-        } else {
-            error("esperado 'length' ou identificador de método após '.'");
-        }
-    }
-
-    // ListExp -> Exp ListExp' | lambda
-    // Lista de argumentos em chamada de metodo (pode ser vazia)
-    void parseListExp() {
-        if (hadError_) return;
-        if (isPrimExpStart()) {
-            parseExp();
-            if (hadError_) return;
-            parseListExpTail();
-        }
-        // λ
-    }
-
-    // ListExp' -> ',' Exp ListExp' | lambda
-    void parseListExpTail() {
-        if (hadError_) return;
-        if (currentType() == TokenType::COMMA) {
-            match(TokenType::COMMA);
-            if (hadError_) return;
-            parseExp();
-            if (hadError_) return;
-            parseListExpTail();
-        }
-        // λ
-    }
-
-    // PrimExp -> 'new' PrimExp' | '!' Exp | '(' Exp ')'
-    //           | 'true' | 'false' | Id | Number | 'this'
-    // Expressao primaria: o "atomo" de uma expressao
-    void parsePrimExp() {
-        if (hadError_) return;
-        if (currentType() == TokenType::NEW) {
-            match(TokenType::NEW);
-            if (hadError_) return;
-            parsePrimExpTail();
-        } else if (currentType() == TokenType::NOT) {
-            match(TokenType::NOT);
-            if (hadError_) return;
-            parseExp();
-        } else if (currentType() == TokenType::LPAREN) {
-            match(TokenType::LPAREN);
-            if (hadError_) return;
-            parseExp();
-            if (hadError_) return;
-            match(TokenType::RPAREN);
-        } else if (currentType() == TokenType::TRUE) {
-            match(TokenType::TRUE);
-        } else if (currentType() == TokenType::FALSE) {
-            match(TokenType::FALSE);
-        } else if (currentType() == TokenType::ID) {
-            match(TokenType::ID);
-        } else if (currentType() == TokenType::NUMBER) {
-            match(TokenType::NUMBER);
-        } else if (currentType() == TokenType::THIS) {
-            match(TokenType::THIS);
-        } else {
-            error("esperado uma expressão primária (identificador, número, 'true', 'false', 'this', 'new', '!' ou '(')");
-        }
-    }
-
-    // PrimExp' -> Id '(' ')'        (instanciacao de objeto: new Classe())
-    //            | 'int' '[' Exp ']'  (criacao de array: new int[size])
-    void parsePrimExpTail() {
-        if (hadError_) return;
         if (currentType() == TokenType::ID) {
-            match(TokenType::ID);
-            if (hadError_) return;
-            match(TokenType::LPAREN);
-            if (hadError_) return;
-            match(TokenType::RPAREN);
-        } else if (currentType() == TokenType::INT) {
-            match(TokenType::INT);
-            if (hadError_) return;
-            match(TokenType::LBRACKET);
-            if (hadError_) return;
-            parseExp();
-            if (hadError_) return;
-            match(TokenType::RBRACKET);
-        } else {
-            error("esperado identificador ou 'int' após 'new'");
+            std::string varName = matchAndGet(TokenType::ID); if (hadError_) return nullptr;
+            int ln = tokens_[pos_ - 1].line;
+            return parseComAss(varName, ln);
         }
+        else if (currentType() == TokenType::IF) {
+            match(TokenType::IF); if (hadError_) return nullptr;
+            match(TokenType::LPAREN); if (hadError_) return nullptr;
+            auto cond = parseExp(); if (hadError_) return nullptr;
+            match(TokenType::RPAREN); if (hadError_) return nullptr;
+            match(TokenType::LBRACE); if (hadError_) return nullptr;
+            auto thenBody = parseLcom(); if (hadError_) return nullptr;
+            match(TokenType::RBRACE); if (hadError_) return nullptr;
+
+            // I → else { Lcom } | λ
+            std::vector<std::unique_ptr<Stmt>> elseBody;
+            if (currentType() == TokenType::ELSE) {
+                match(TokenType::ELSE); if (hadError_) return nullptr;
+                match(TokenType::LBRACE); if (hadError_) return nullptr;
+                elseBody = parseLcom(); if (hadError_) return nullptr;
+                match(TokenType::RBRACE); if (hadError_) return nullptr;
+            }
+            return std::make_unique<IfStmt>(std::move(cond), std::move(thenBody), std::move(elseBody));
+        }
+        else if (currentType() == TokenType::WHILE) {
+            match(TokenType::WHILE); if (hadError_) return nullptr;
+            match(TokenType::LPAREN); if (hadError_) return nullptr;
+            auto cond = parseExp(); if (hadError_) return nullptr;
+            match(TokenType::RPAREN); if (hadError_) return nullptr;
+            match(TokenType::LBRACE); if (hadError_) return nullptr;
+            auto body = parseLcom(); if (hadError_) return nullptr;
+            match(TokenType::RBRACE); if (hadError_) return nullptr;
+            return std::make_unique<WhileStmt>(std::move(cond), std::move(body));
+        }
+
+        else if (currentType() == TokenType::SYSTEM) {
+            match(TokenType::SYSTEM); if (hadError_) return nullptr;
+            match(TokenType::DOT); if (hadError_) return nullptr;
+            match(TokenType::OUT); if (hadError_) return nullptr;
+            match(TokenType::DOT); if (hadError_) return nullptr;
+            match(TokenType::PRINTLN); if (hadError_) return nullptr;
+            match(TokenType::LPAREN); if (hadError_) return nullptr;
+            auto exp = parseExp(); if (hadError_) return nullptr;
+            match(TokenType::RPAREN); if (hadError_) return nullptr;
+            match(TokenType::SEMICOLON); if (hadError_) return nullptr;
+            return std::make_unique<PrintStmt>(std::move(exp));
+        }
+        else {
+            error("esperado um comando (identificador, 'if', 'while' ou 'System')");
+            return nullptr;
+        }
+    }
+
+    // ComAss → '=' Exp ';' | '[' Exp ']' '=' Exp ';'
+    std::unique_ptr<Stmt> parseComAss(const std::string& varName, int ln) {
+        if (hadError_) return nullptr;
+        if (currentType() == TokenType::ASSIGN) {
+            match(TokenType::ASSIGN); if (hadError_) return nullptr;
+            auto exp = parseExp(); if (hadError_) return nullptr;
+            match(TokenType::SEMICOLON); if (hadError_) return nullptr;
+            auto stmt = std::make_unique<AssignStmt>(varName, std::move(exp));
+            stmt->line = ln;
+            return stmt;
+        } else if (currentType() == TokenType::LBRACKET) {
+            match(TokenType::LBRACKET); if (hadError_) return nullptr;
+            auto idx = parseExp(); if (hadError_) return nullptr;
+            match(TokenType::RBRACKET); if (hadError_) return nullptr;
+            match(TokenType::ASSIGN); if (hadError_) return nullptr;
+            auto val = parseExp(); if (hadError_) return nullptr;
+            match(TokenType::SEMICOLON); if (hadError_) return nullptr;
+            auto stmt = std::make_unique<ArrayAssignStmt>(varName, std::move(idx), std::move(val));
+            stmt->line = ln;
+            return stmt;
+        }
+        error("esperado '=' ou '[' após identificador em comando");
+        return nullptr;
+    }
+
+    // ==================== Expressões (hierarquia de precedência) ====================
+
+    // Exp → Andexp
+    std::unique_ptr<Exp> parseExp() {
+        if (hadError_) return nullptr;
+        return parseAndexp();
+    }
+
+    // Andexp → Relexp Andexp'
+    // Andexp' → '&&' Relexp Andexp' | λ
+    std::unique_ptr<Exp> parseAndexp() {
+        if (hadError_) return nullptr;
+        auto left = parseRelexp(); if (hadError_) return nullptr;
+        while (currentType() == TokenType::AND) {
+            match(TokenType::AND); if (hadError_) return nullptr;
+            auto right = parseRelexp(); if (hadError_) return nullptr;
+            left = std::make_unique<AndExp>(std::move(left), std::move(right));
+        }
+        return left;
+    }
+
+    // Relexp → Addexp Relexp'
+    // Relexp' → '<' Addexp Relexp' | λ
+    std::unique_ptr<Exp> parseRelexp() {
+        if (hadError_) return nullptr;
+        auto left = parseAddexp(); if (hadError_) return nullptr;
+        while (currentType() == TokenType::LT) {
+            match(TokenType::LT); if (hadError_) return nullptr;
+            auto right = parseAddexp(); if (hadError_) return nullptr;
+            left = std::make_unique<LessThanExp>(std::move(left), std::move(right));
+        }
+        return left;
+    }
+
+    // Addexp → Mulexp Addexp'
+    // Addexp' → '+' Mulexp Addexp' | '-' Mulexp Addexp' | λ
+    std::unique_ptr<Exp> parseAddexp() {
+        if (hadError_) return nullptr;
+        auto left = parseMulexp(); if (hadError_) return nullptr;
+        while (currentType() == TokenType::PLUS || currentType() == TokenType::MINUS) {
+            if (currentType() == TokenType::PLUS) {
+                match(TokenType::PLUS); if (hadError_) return nullptr;
+                auto right = parseMulexp(); if (hadError_) return nullptr;
+                left = std::make_unique<PlusExp>(std::move(left), std::move(right));
+            } else {
+                match(TokenType::MINUS); if (hadError_) return nullptr;
+                auto right = parseMulexp(); if (hadError_) return nullptr;
+                left = std::make_unique<MinusExp>(std::move(left), std::move(right));
+            }
+        }
+        return left;
+    }
+
+    // Mulexp → Unexp Mulexp'
+    // Mulexp' → '*' Unexp Mulexp' | λ
+    std::unique_ptr<Exp> parseMulexp() {
+        if (hadError_) return nullptr;
+        auto left = parseUnexp(); if (hadError_) return nullptr;
+        while (currentType() == TokenType::MULT) {
+            match(TokenType::MULT); if (hadError_) return nullptr;
+            auto right = parseUnexp(); if (hadError_) return nullptr;
+            left = std::make_unique<TimesExp>(std::move(left), std::move(right));
+        }
+        return left;
+    }
+
+    // Unexp → '!' Unexp | Psfexp
+    std::unique_ptr<Exp> parseUnexp() {
+        if (hadError_) return nullptr;
+        if (currentType() == TokenType::NOT) {
+            match(TokenType::NOT); if (hadError_) return nullptr;
+            auto inner = parseUnexp(); if (hadError_) return nullptr;
+            return std::make_unique<NotExp>(std::move(inner));
+        }
+        return parsePsfexp();
+    }
+
+    // Psfexp → Priexp Psfexp'
+    // Psfexp' → '[' Exp ']' Psfexp' | '.' 'length' Psfexp' | '.' Id '(' Lexp ')' Psfexp' | λ
+    std::unique_ptr<Exp> parsePsfexp() {
+        if (hadError_) return nullptr;
+        auto expr = parsePriexp(); if (hadError_) return nullptr;
+
+        while (!hadError_) {
+            if (currentType() == TokenType::LBRACKET) {
+                match(TokenType::LBRACKET); if (hadError_) return nullptr;
+                auto idx = parseExp(); if (hadError_) return nullptr;
+                match(TokenType::RBRACKET); if (hadError_) return nullptr;
+                expr = std::make_unique<ArrayLookupExp>(std::move(expr), std::move(idx));
+            }
+            else if (currentType() == TokenType::DOT) {
+                match(TokenType::DOT); if (hadError_) return nullptr;
+                if (currentType() == TokenType::LENGTH) {
+                    match(TokenType::LENGTH); if (hadError_) return nullptr;
+                    expr = std::make_unique<ArrayLengthExp>(std::move(expr));
+                } else if (currentType() == TokenType::ID) {
+                    std::string method = matchAndGet(TokenType::ID); if (hadError_) return nullptr;
+                    match(TokenType::LPAREN); if (hadError_) return nullptr;
+                    auto args = parseLexp(); if (hadError_) return nullptr;
+                    match(TokenType::RPAREN); if (hadError_) return nullptr;
+                    expr = std::make_unique<MethodCallExp>(std::move(expr), method, std::move(args));
+                } else {
+                    error("esperado 'length' ou identificador de método após '.'");
+                    return nullptr;
+                }
+            }
+            else { break; }
+        }
+        return expr;
+    }
+
+    // Priexp → '(' Exp ')' | true | false | Id | Number | this | new Id '(' ')' | new int '[' Exp ']'
+    std::unique_ptr<Exp> parsePriexp() {
+        if (hadError_) return nullptr;
+
+        if (currentType() == TokenType::LPAREN) {
+            match(TokenType::LPAREN); if (hadError_) return nullptr;
+            auto e = parseExp(); if (hadError_) return nullptr;
+            match(TokenType::RPAREN); if (hadError_) return nullptr;
+            return e;
+        }
+        else if (currentType() == TokenType::TRUE) {
+            match(TokenType::TRUE);
+            return std::make_unique<TrueLiteralExp>();
+        }
+        else if (currentType() == TokenType::FALSE) {
+            match(TokenType::FALSE);
+            return std::make_unique<FalseLiteralExp>();
+        }
+        else if (currentType() == TokenType::ID) {
+            std::string name = matchAndGet(TokenType::ID);
+            auto exp = std::make_unique<IdentifierExp>(name);
+            exp->line = tokens_[pos_ - 1].line;
+            return exp;
+        }
+        else if (currentType() == TokenType::NUMBER) {
+            int val = std::stoi(currentToken().lexeme);
+            match(TokenType::NUMBER);
+            return std::make_unique<IntLiteralExp>(val);
+        }
+        else if (currentType() == TokenType::THIS) {
+            match(TokenType::THIS);
+            return std::make_unique<ThisExp>();
+        }
+        else if (currentType() == TokenType::NEW) {
+            match(TokenType::NEW); if (hadError_) return nullptr;
+            if (currentType() == TokenType::INT) {
+                match(TokenType::INT); if (hadError_) return nullptr;
+                match(TokenType::LBRACKET); if (hadError_) return nullptr;
+                auto size = parseExp(); if (hadError_) return nullptr;
+                match(TokenType::RBRACKET); if (hadError_) return nullptr;
+                return std::make_unique<NewArrayExp>(std::move(size));
+            } else if (currentType() == TokenType::ID) {
+                std::string className = matchAndGet(TokenType::ID); if (hadError_) return nullptr;
+                match(TokenType::LPAREN); if (hadError_) return nullptr;
+                match(TokenType::RPAREN); if (hadError_) return nullptr;
+                return std::make_unique<NewObjectExp>(className);
+            }
+            error("esperado identificador ou 'int' após 'new'");
+            return nullptr;
+        }
+        error("esperado expressão primária");
+        return nullptr;
+    }
+
+    // Lexp → Exp Lexp' | λ
+    // Lexp' → ',' Exp Lexp' | λ
+    std::vector<std::unique_ptr<Exp>> parseLexp() {
+        std::vector<std::unique_ptr<Exp>> args;
+        if (hadError_) return args;
+        if (!isPrimExpStart()) return args;  // λ
+
+        auto first = parseExp(); if (hadError_) return args;
+        args.push_back(std::move(first));
+
+        while (!hadError_ && currentType() == TokenType::COMMA) {
+            match(TokenType::COMMA); if (hadError_) break;
+            auto e = parseExp(); if (hadError_) break;
+            args.push_back(std::move(e));
+        }
+        return args;
     }
 
     // ==================== Conjuntos FIRST ====================
-    // Funcoes que verificam se o token atual pertence ao conjunto FIRST
-    // de uma producao. Usadas para decidir qual alternativa seguir.
 
-    // FIRST(Type) = { int, boolean, ID }
     bool isTypeStart() const {
         return currentType() == TokenType::INT ||
                currentType() == TokenType::BOOLEAN ||
                currentType() == TokenType::ID;
     }
 
-    // FIRST(Cmd) = { '{', if, while, System, ID }
     bool isCmdStart() const {
-        return currentType() == TokenType::LBRACE ||
+        return currentType() == TokenType::ID ||
                currentType() == TokenType::IF ||
                currentType() == TokenType::WHILE ||
-               currentType() == TokenType::SYSTEM ||
-               currentType() == TokenType::ID;
+               currentType() == TokenType::SYSTEM;
     }
 
-    // FIRST(Op) = { &&, <, >, +, -, * }
-    bool isOp() const {
-        return currentType() == TokenType::AND ||
-               currentType() == TokenType::LT ||
-               currentType() == TokenType::GT ||
-               currentType() == TokenType::PLUS ||
-               currentType() == TokenType::MINUS ||
-               currentType() == TokenType::MULT;
-    }
-
-    // FIRST(PrimExp) = { new, !, (, true, false, ID, NUMBER, this }
     bool isPrimExpStart() const {
         return currentType() == TokenType::NEW ||
                currentType() == TokenType::NOT ||

@@ -1,25 +1,14 @@
 %{
 /**
  * @file lexer.l
- * @brief Analisador Lexico (Lexer) do compilador MiniJava, implementado com Flex.
+ * @brief Analisador Léxico (Lexer) do compilador MiniJava, implementado com Flex.
  *
- * O Flex gera um automato finito deterministico (AFD) a partir das regras
- * de expressoes regulares definidas abaixo. O AFD percorre o codigo fonte
- * caractere a caractere, identificando padroes e gerando tokens.
+ * Responsabilidades:
+ *   1. Remover comentários e whitespace
+ *   2. Tokenizar: palavras-chave, operadores, delimitadores, identificadores, números
+ *   3. Reportar erros léxicos com linha, coluna e sugestão de correção
  *
- * Responsabilidades deste modulo:
- *   1. PRE-PROCESSAMENTO: remover comentarios e whitespace
- *   2. TOKENIZACAO: reconhecer palavras-chave, operadores, delimitadores,
- *      identificadores e numeros, gerando um Token para cada um
- *   3. TRATAMENTO DE ERROS: reportar caracteres invalidos com sugestoes
- *      de correcao baseadas em distancia de Levenshtein
- *
- * Saida: preenche o vetor global tokenList[] com todos os tokens encontrados.
- *
- * Estrutura do arquivo Flex (.l):
- *   Secao 1 (%{ ... %})  -> Codigo C++ copiado diretamente para o .c gerado
- *   Secao 2 (definicoes) -> Macros de expressoes regulares reutilizaveis
- *   Secao 3 (%% ... %%)  -> Regras padrao->acao (o coracao do lexer)
+ * Saída: preenche o vetor global tokenList[].
  */
 
 #include "token.h"
@@ -28,21 +17,24 @@
 #include <cstring>
 #include <algorithm>
 
-// Lista de todos os tokens gerados durante a analise lexica.
-// Preenchida sequencialmente conforme o Flex reconhece padroes.
+// Lista de todos os tokens gerados durante a análise léxica.
 std::vector<Token> tokenList;
 
-// Flag que indica se algum erro lexico foi encontrado.
-// Se true, o main.cpp nao prossegue para a analise sintatica.
+// Flag que indica se algum erro léxico foi encontrado.
 bool lexerHadError = false;
 
-// Contador manual de linhas. Incrementado a cada '\n' encontrado.
-// Usado para reportar a localizacao de erros ao usuario.
+// Contadores manuais de linha e coluna.
 int lineNumber = 1;
+int columnNumber = 1;
 
-// Lista de palavras-chave da linguagem (usada para sugestoes de correcao).
-// Quando o lexer encontra um token invalido, compara com estas palavras
-// para sugerir a correcao mais provavel.
+// Flag para controlar se o lexer deve parar no primeiro erro.
+// Configurada pelo main.cpp antes de chamar yylex().
+bool stopOnFirstError = false;
+
+// Flag para controlar se sugestões de correção devem ser exibidas.
+bool showSuggestions = true;
+
+// Lista de palavras-chave (usada para sugestões de correção).
 static const char* keywords[] = {
     "class", "public", "static", "void", "main", "String",
     "return", "int", "boolean", "if", "else", "while",
@@ -52,27 +44,25 @@ static const char* keywords[] = {
 
 /**
  * @brief Cria um Token e o adiciona ao final de tokenList[].
- * @param type Tipo do token (ex: TokenType::CLASS, TokenType::ID)
- * @param text yytext do Flex -- variavel automatica que contem o trecho exato
- *             do codigo fonte que casou com a regra atual (ex: ";", "class", "myVar")
- * @param line Numero da linha atual
  */
-void addToken(TokenType type, const char* text, int line) {
+void addToken(TokenType type, const char* text, int line, int col) {
     Token tok;
     tok.type = type;
     tok.lexeme = std::string(text);
     tok.line = line;
+    tok.column = col;
     tokenList.push_back(tok);
 }
 
 /**
- * @brief Calcula a distancia de Levenshtein entre duas strings.
- *
- * A distancia de Levenshtein mede o numero minimo de operacoes
- * (insercao, remocao, substituicao) para transformar s1 em s2.
- * Usada para encontrar a palavra-chave mais proxima de um token invalido.
- *
- * Exemplo: levenshtein("clas", "class") = 1 (falta um 's')
+ * @brief Atualiza o contador de coluna após consumir um token.
+ */
+void updateColumn() {
+    columnNumber += yyleng;
+}
+
+/**
+ * @brief Calcula a distância de Levenshtein entre duas strings.
  */
 int levenshtein(const std::string& s1, const std::string& s2) {
     int len1 = s1.size(), len2 = s2.size();
@@ -89,30 +79,26 @@ int levenshtein(const std::string& s1, const std::string& s2) {
 }
 
 /**
- * @brief Reporta erro lexico e sugere correcao se possivel.
- *
- * Compara o token invalido com todas as palavras-chave usando
- * distancia de Levenshtein. Se a distancia for <= 2, sugere a correcao.
- *
- * Exemplo de saida:
- *   Erro lexico na linha 3: token invalido "clas"
- *     Sugestao: voce quis dizer "class"?
+ * @brief Reporta erro léxico com linha:coluna e sugere correção se possível.
  */
-void suggestCorrection(const char* text, int line) {
+void reportLexError(const char* text, int line, int col) {
     std::string input(text);
     std::string bestMatch = "";
     int bestDist = 999;
 
-    for (int i = 0; keywords[i] != nullptr; i++) {
-        int dist = levenshtein(input, std::string(keywords[i]));
-        if (dist < bestDist) {
-            bestDist = dist;
-            bestMatch = keywords[i];
+    if (showSuggestions) {
+        for (int i = 0; keywords[i] != nullptr; i++) {
+            int dist = levenshtein(input, std::string(keywords[i]));
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestMatch = keywords[i];
+            }
         }
     }
 
-    std::cerr << "Erro léxico na linha " << line << ": token inválido \"" << text << "\"" << std::endl;
-    if (bestDist <= 2) {
+    std::cerr << "Erro léxico na linha " << line << ":" << col
+              << ": token inválido \"" << text << "\"" << std::endl;
+    if (showSuggestions && bestDist <= 2) {
         std::cerr << "  Sugestão: você quis dizer \"" << bestMatch << "\"?" << std::endl;
     }
     lexerHadError = true;
@@ -120,20 +106,11 @@ void suggestCorrection(const char* text, int line) {
 
 %}
 
-/* === Opcoes do Flex === */
+/* === Opções do Flex === */
 %option noyywrap
-    /* noyywrap: nao chama yywrap() ao fim do arquivo (so processa um arquivo) */
 %option yylineno
-    /* yylineno: ativa a variavel automatica yylineno (contador de linhas do Flex) */
 %option nounput
-    /* nounput: nao gera a funcao yyunput (nao usada neste lexer) */
-
-/* === Variaveis automaticas do Flex (referencia rapida) ===
- *   yytext  (char*) -- texto exato que casou com a regra atual
- *   yyleng  (int)   -- tamanho de yytext (strlen)
- *   yyin    (FILE*) -- arquivo de entrada sendo lido
- *   yylineno (int)  -- contador de linhas automatico
- */
+%option noinput
 
 DIGIT       [0-9]
 LETTER      [a-zA-Z]
@@ -144,95 +121,85 @@ NEWLINE     \n
 
 %%
 
-    /* ================================================================ */
-    /* REGRAS DO LEXER                                                  */
-    /* Formato: padrao { acao }                                         */
-    /* O Flex casa o padrao mais longo possivel (maximal munch).         */
-    /* Em caso de empate no tamanho, a regra que aparece primeiro vence. */
-    /* ================================================================ */
-
-    /* --- Comentarios (pre-processador integrado) --- */
-    /* Descartados sem gerar tokens. */
-"//".*                          { /* Ignora comentario de linha unica */ }
-"/*"([^*]|\*+[^*/])*\*+"/"      { 
-    /* Comentario de multiplas linhas: conta \n internos */
+    /* --- Comentários --- */
+"//".*                          { updateColumn(); }
+"/*"([^*]|\*+[^*/])*\*+"/"     {
     for (int i = 0; yytext[i]; i++) {
-        if (yytext[i] == '\n') lineNumber++;
+        if (yytext[i] == '\n') { lineNumber++; columnNumber = 1; }
+        else { columnNumber++; }
     }
 }
 
-    /* --- Espacos em branco (descartados) --- */
-{WHITESPACE}    { /* Ignora espacos, tabs e \r */ }
-{NEWLINE}       { lineNumber++; }
+    /* --- Espaços em branco --- */
+{WHITESPACE}    { updateColumn(); }
+{NEWLINE}       { lineNumber++; columnNumber = 1; }
 
     /* --- Palavras-chave --- */
-    /* Aparecem ANTES de {ID} para ter prioridade em caso de empate. */
-"class"         { addToken(TokenType::CLASS, yytext, lineNumber); }
-"public"        { addToken(TokenType::PUBLIC, yytext, lineNumber); }
-"static"        { addToken(TokenType::STATIC, yytext, lineNumber); }
-"void"          { addToken(TokenType::VOID, yytext, lineNumber); }
-"main"          { addToken(TokenType::MAIN, yytext, lineNumber); }
-"String"        { addToken(TokenType::STRING, yytext, lineNumber); }
-"return"        { addToken(TokenType::RETURN, yytext, lineNumber); }
-"int"           { addToken(TokenType::INT, yytext, lineNumber); }
-"boolean"       { addToken(TokenType::BOOLEAN, yytext, lineNumber); }
-"if"            { addToken(TokenType::IF, yytext, lineNumber); }
-"else"          { addToken(TokenType::ELSE, yytext, lineNumber); }
-"while"         { addToken(TokenType::WHILE, yytext, lineNumber); }
-"System"        { addToken(TokenType::SYSTEM, yytext, lineNumber); }
-"out"           { addToken(TokenType::OUT, yytext, lineNumber); }
-"println"       { addToken(TokenType::PRINTLN, yytext, lineNumber); }
-"true"          { addToken(TokenType::TRUE, yytext, lineNumber); }
-"false"         { addToken(TokenType::FALSE, yytext, lineNumber); }
-"this"          { addToken(TokenType::THIS, yytext, lineNumber); }
-"new"           { addToken(TokenType::NEW, yytext, lineNumber); }
-"extends"       { addToken(TokenType::EXTENDS, yytext, lineNumber); }
-"length"        { addToken(TokenType::LENGTH, yytext, lineNumber); }
+"class"         { addToken(TokenType::CLASS, yytext, lineNumber, columnNumber); updateColumn(); }
+"public"        { addToken(TokenType::PUBLIC, yytext, lineNumber, columnNumber); updateColumn(); }
+"static"        { addToken(TokenType::STATIC, yytext, lineNumber, columnNumber); updateColumn(); }
+"void"          { addToken(TokenType::VOID, yytext, lineNumber, columnNumber); updateColumn(); }
+"main"          { addToken(TokenType::MAIN, yytext, lineNumber, columnNumber); updateColumn(); }
+"String"        { addToken(TokenType::STRING, yytext, lineNumber, columnNumber); updateColumn(); }
+"return"        { addToken(TokenType::RETURN, yytext, lineNumber, columnNumber); updateColumn(); }
+"int"           { addToken(TokenType::INT, yytext, lineNumber, columnNumber); updateColumn(); }
+"boolean"       { addToken(TokenType::BOOLEAN, yytext, lineNumber, columnNumber); updateColumn(); }
+"if"            { addToken(TokenType::IF, yytext, lineNumber, columnNumber); updateColumn(); }
+"else"          { addToken(TokenType::ELSE, yytext, lineNumber, columnNumber); updateColumn(); }
+"while"         { addToken(TokenType::WHILE, yytext, lineNumber, columnNumber); updateColumn(); }
+"System"        { addToken(TokenType::SYSTEM, yytext, lineNumber, columnNumber); updateColumn(); }
+"out"           { addToken(TokenType::OUT, yytext, lineNumber, columnNumber); updateColumn(); }
+"println"       { addToken(TokenType::PRINTLN, yytext, lineNumber, columnNumber); updateColumn(); }
+"true"          { addToken(TokenType::TRUE, yytext, lineNumber, columnNumber); updateColumn(); }
+"false"         { addToken(TokenType::FALSE, yytext, lineNumber, columnNumber); updateColumn(); }
+"this"          { addToken(TokenType::THIS, yytext, lineNumber, columnNumber); updateColumn(); }
+"new"           { addToken(TokenType::NEW, yytext, lineNumber, columnNumber); updateColumn(); }
+"extends"       { addToken(TokenType::EXTENDS, yytext, lineNumber, columnNumber); updateColumn(); }
+"length"        { addToken(TokenType::LENGTH, yytext, lineNumber, columnNumber); updateColumn(); }
 
     /* --- Operadores --- */
-    /* "&&" vem antes para nao ser lido como dois tokens separados. */
-"&&"            { addToken(TokenType::AND, yytext, lineNumber); }
-"<"             { addToken(TokenType::LT, yytext, lineNumber); }
-">"             { addToken(TokenType::GT, yytext, lineNumber); }
-"+"             { addToken(TokenType::PLUS, yytext, lineNumber); }
-"-"             { addToken(TokenType::MINUS, yytext, lineNumber); }
-"*"             { addToken(TokenType::MULT, yytext, lineNumber); }
-"="             { addToken(TokenType::ASSIGN, yytext, lineNumber); }
-"!"             { addToken(TokenType::NOT, yytext, lineNumber); }
+"&&"            { addToken(TokenType::AND, yytext, lineNumber, columnNumber); updateColumn(); }
+"<"             { addToken(TokenType::LT, yytext, lineNumber, columnNumber); updateColumn(); }
+">"             { addToken(TokenType::GT, yytext, lineNumber, columnNumber); updateColumn(); }
+"+"             { addToken(TokenType::PLUS, yytext, lineNumber, columnNumber); updateColumn(); }
+"-"             { addToken(TokenType::MINUS, yytext, lineNumber, columnNumber); updateColumn(); }
+"*"             { addToken(TokenType::MULT, yytext, lineNumber, columnNumber); updateColumn(); }
+"="             { addToken(TokenType::ASSIGN, yytext, lineNumber, columnNumber); updateColumn(); }
+"!"             { addToken(TokenType::NOT, yytext, lineNumber, columnNumber); updateColumn(); }
 
     /* --- Delimitadores --- */
-"("             { addToken(TokenType::LPAREN, yytext, lineNumber); }
-")"             { addToken(TokenType::RPAREN, yytext, lineNumber); }
-"["             { addToken(TokenType::LBRACKET, yytext, lineNumber); }
-"]"             { addToken(TokenType::RBRACKET, yytext, lineNumber); }
-"{"             { addToken(TokenType::LBRACE, yytext, lineNumber); }
-"}"             { addToken(TokenType::RBRACE, yytext, lineNumber); }
-";"             { addToken(TokenType::SEMICOLON, yytext, lineNumber); }
-","             { addToken(TokenType::COMMA, yytext, lineNumber); }
-"."             { addToken(TokenType::DOT, yytext, lineNumber); }
+"("             { addToken(TokenType::LPAREN, yytext, lineNumber, columnNumber); updateColumn(); }
+")"             { addToken(TokenType::RPAREN, yytext, lineNumber, columnNumber); updateColumn(); }
+"["             { addToken(TokenType::LBRACKET, yytext, lineNumber, columnNumber); updateColumn(); }
+"]"             { addToken(TokenType::RBRACKET, yytext, lineNumber, columnNumber); updateColumn(); }
+"{"             { addToken(TokenType::LBRACE, yytext, lineNumber, columnNumber); updateColumn(); }
+"}"             { addToken(TokenType::RBRACE, yytext, lineNumber, columnNumber); updateColumn(); }
+";"             { addToken(TokenType::SEMICOLON, yytext, lineNumber, columnNumber); updateColumn(); }
+","             { addToken(TokenType::COMMA, yytext, lineNumber, columnNumber); updateColumn(); }
+"."             { addToken(TokenType::DOT, yytext, lineNumber, columnNumber); updateColumn(); }
 
     /* --- Identificadores --- */
-    /* Comeca com letra, pode conter letras, digitos e _. */
-    /* So casa aqui se NAO casou com nenhuma keyword acima. */
-{ID}            { addToken(TokenType::ID, yytext, lineNumber); }
+{ID}            { addToken(TokenType::ID, yytext, lineNumber, columnNumber); updateColumn(); }
 
-    /* --- Numeros inteiros --- */
-{NUMBER}        { addToken(TokenType::NUMBER, yytext, lineNumber); }
+    /* --- Números inteiros --- */
+{NUMBER}        { addToken(TokenType::NUMBER, yytext, lineNumber, columnNumber); updateColumn(); }
 
-    /* --- Identificadores invalidos (comecam com digito + letras) --- */
+    /* --- Identificadores inválidos (começam com dígito) --- */
 {DIGIT}+{LETTER}({LETTER}|{DIGIT}|"_")*  {
-    suggestCorrection(yytext, lineNumber);
-    addToken(TokenType::UNKNOWN, yytext, lineNumber);
+    reportLexError(yytext, lineNumber, columnNumber);
+    addToken(TokenType::UNKNOWN, yytext, lineNumber, columnNumber);
+    updateColumn();
+    if (stopOnFirstError) return 1;
 }
 
     /* --- Caractere desconhecido (fallback) --- */
-    /* O ponto (.) casa com qualquer caractere exceto \n. */
-    /* DEVE ser a ultima regra. */
 .               {
-    std::cerr << "Erro léxico na linha " << lineNumber 
+    std::cerr << "Erro léxico na linha " << lineNumber << ":" << columnNumber
               << ": caractere inesperado '" << yytext << "'" << std::endl;
     lexerHadError = true;
-    addToken(TokenType::UNKNOWN, yytext, lineNumber);
+    addToken(TokenType::UNKNOWN, yytext, lineNumber, columnNumber);
+    updateColumn();
+    if (stopOnFirstError) return 1;
 }
 
 %%

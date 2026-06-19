@@ -1,18 +1,11 @@
 /**
  * @file symbol_table.h
- * @brief Tabela de Símbolos do compilador MiniJava.
+ * @brief Tabela de Símbolos do compilador MiniJava (Unidade 2).
  *
- * A tabela de símbolos é uma estrutura de dados que armazena informações
- * sobre todas as entidades declaradas no programa (classes, métodos, variáveis).
- *
- * É preenchida durante a análise sintática: sempre que o parser reconhece
- * uma declaração, ele insere um registro aqui. Isso permite:
- *   - Verificar se um identificador foi declarado antes de ser usado
- *   - Conhecer o tipo de cada variável/método
- *   - Saber em qual escopo cada símbolo foi definido
- *
- * Nesta implementação, a tabela é um vetor linear (sem hash),
- * suficiente para a fase atual do compilador.
+ * Melhorias em relação à Unidade 1:
+ *   - Busca por nome e escopo (para resolução de nomes na análise semântica)
+ *   - Suporte a herança (campo parent na classe)
+ *   - Detecção de duplicatas
  */
 
 #ifndef SYMBOL_TABLE_H
@@ -22,52 +15,25 @@
 #include <vector>
 #include <iostream>
 #include <iomanip>
+#include <algorithm>
 
-/**
- * @enum SymbolCategory
- * @brief Classifica o tipo de declaração que um símbolo representa.
- *
- * Cada símbolo na tabela pertence a exatamente uma categoria:
- *   - CLASS: declaração de classe (escopo global)
- *   - METHOD: declaração de método (escopo da classe)
- *   - INSTANCE_VAR: variável de instância (atributo da classe)
- *   - LOCAL_VAR: variável local (dentro de um método)
- *   - PARAMETER: parâmetro formal de um método
- */
 enum class SymbolCategory {
-    CLASS,          // Declaração de classe
-    METHOD,         // Declaração de método
-    INSTANCE_VAR,   // Variável de instância (atributo)
-    LOCAL_VAR,      // Variável local de método
-    PARAMETER       // Parâmetro formal de método
+    CLASS,
+    METHOD,
+    INSTANCE_VAR,
+    LOCAL_VAR,
+    PARAMETER
 };
 
-/**
- * @struct Symbol
- * @brief Representa uma entrada individual na tabela de símbolos.
- *
- * Cada símbolo armazena:
- *   - name: nome do identificador (ex: "Factorial", "compute", "num")
- *   - type: tipo associado (ex: "int", "boolean", "int[]", "Factorial", "class", "void")
- *   - scope: escopo onde foi declarado (ex: "global", "Factorial", "Factorial.compute")
- *   - line: linha da declaração no código fonte
- *   - category: classificação do símbolo (classe, método, variável, etc.)
- *
- * Exemplo de entrada:
- *   { name="num", type="int", scope="Factorial.compute", line=5, category=LOCAL_VAR }
- */
 struct Symbol {
-    std::string name;           // Nome do identificador
-    std::string type;           // Tipo (int, boolean, nome de classe, void, etc.)
-    std::string scope;          // Escopo de declaração (global, Classe, Classe.metodo)
-    int line;                   // Linha no código fonte onde foi declarado
-    SymbolCategory category;    // Categoria do símbolo
+    std::string name;
+    std::string type;
+    std::string scope;
+    int line;
+    SymbolCategory category;
+    std::string parent;  // Para classes: nome da classe pai (herança)
 };
 
-/**
- * @brief Converte uma SymbolCategory para string legível em português.
- * Usado na impressão formatada da tabela de símbolos.
- */
 inline std::string categoryToString(SymbolCategory cat) {
     switch (cat) {
         case SymbolCategory::CLASS:        return "classe";
@@ -79,57 +45,99 @@ inline std::string categoryToString(SymbolCategory cat) {
     return "desconhecido";
 }
 
-/**
- * @class SymbolTable
- * @brief Armazena e gerencia todos os símbolos declarados no programa.
- *
- * Funciona como um registro sequencial: símbolos são adicionados na ordem
- * em que são encontrados durante o parsing. A impressão final mostra
- * uma tabela formatada com todas as declarações.
- *
- * Fluxo de uso:
- *   1. O parser encontra uma declaração (ex: "int x;")
- *   2. Chama addSymbol("x", "int", "Classe.metodo", linha, LOCAL_VAR)
- *   3. No final, main.cpp chama print() para exibir a tabela completa
- */
 class SymbolTable {
 public:
-    /**
-     * @brief Adiciona um novo símbolo à tabela.
-     * @param name Nome do identificador
-     * @param type Tipo associado ao símbolo
-     * @param scope Escopo onde foi declarado
-     * @param line Linha no código fonte
-     * @param category Categoria do símbolo
-     */
     void addSymbol(const std::string& name, const std::string& type,
-                   const std::string& scope, int line, SymbolCategory category) {
+                   const std::string& scope, int line, SymbolCategory category,
+                   const std::string& parent = "") {
         Symbol sym;
         sym.name = name;
         sym.type = type;
         sym.scope = scope;
         sym.line = line;
         sym.category = category;
+        sym.parent = parent;
         symbols_.push_back(sym);
     }
 
     /**
-     * @brief Imprime a tabela de símbolos formatada no stdout.
-     *
-     * Formato:
-     *   Nome                Tipo           Escopo                   Linha   Categoria
-     *   --------------------------------------------------------------------------------------
-     *   Factorial           class          global                   1       classe
-     *   compute             int            Factorial                3       método
-     *   num                 int            Factorial.compute        4       var. local
+     * @brief Busca um símbolo por nome e escopo.
+     * Segue a resolução: escopo local → classe → classe pai.
      */
+    const Symbol* lookup(const std::string& name, const std::string& scope) const {
+        // 1. Busca no escopo exato (parâmetro/variável local)
+        for (auto& sym : symbols_) {
+            if (sym.name == name && sym.scope == scope &&
+                (sym.category == SymbolCategory::LOCAL_VAR || sym.category == SymbolCategory::PARAMETER))
+                return &sym;
+        }
+        // 2. Busca como atributo da classe (escopo = nome da classe)
+        std::string classScope = scope;
+        auto dotPos = classScope.find('.');
+        if (dotPos != std::string::npos) classScope = classScope.substr(0, dotPos);
+
+        for (auto& sym : symbols_) {
+            if (sym.name == name && sym.scope == classScope &&
+                sym.category == SymbolCategory::INSTANCE_VAR)
+                return &sym;
+        }
+        // 3. Busca em classe pai (herança)
+        const Symbol* classSym = lookupClass(classScope);
+        if (classSym && !classSym->parent.empty()) {
+            return lookupInherited(name, classSym->parent);
+        }
+        return nullptr;
+    }
+
+    /** Busca uma classe por nome. */
+    const Symbol* lookupClass(const std::string& name) const {
+        for (auto& sym : symbols_) {
+            if (sym.name == name && sym.category == SymbolCategory::CLASS)
+                return &sym;
+        }
+        return nullptr;
+    }
+
+    /** Busca um método em uma classe (ou herdado). */
+    const Symbol* lookupMethod(const std::string& className, const std::string& methodName) const {
+        for (auto& sym : symbols_) {
+            if (sym.name == methodName && sym.scope == className &&
+                sym.category == SymbolCategory::METHOD)
+                return &sym;
+        }
+        // Busca na classe pai
+        const Symbol* cls = lookupClass(className);
+        if (cls && !cls->parent.empty()) {
+            return lookupMethod(cls->parent, methodName);
+        }
+        return nullptr;
+    }
+
+    /** Verifica se um símbolo já existe no mesmo escopo (duplicata). */
+    bool isDuplicate(const std::string& name, const std::string& scope, SymbolCategory cat) const {
+        for (auto& sym : symbols_) {
+            if (sym.name == name && sym.scope == scope && sym.category == cat)
+                return true;
+        }
+        return false;
+    }
+
+    /** Retorna todos os parâmetros de um método. */
+    std::vector<const Symbol*> getMethodParams(const std::string& className, const std::string& methodName) const {
+        std::vector<const Symbol*> params;
+        std::string scope = className + "." + methodName;
+        for (auto& sym : symbols_) {
+            if (sym.scope == scope && sym.category == SymbolCategory::PARAMETER)
+                params.push_back(&sym);
+        }
+        return params;
+    }
+
     void print() const {
         if (symbols_.empty()) {
             std::cout << "(tabela vazia)" << std::endl;
             return;
         }
-
-        // Cabeçalho
         std::cout << std::left
                   << std::setw(20) << "Nome"
                   << std::setw(15) << "Tipo"
@@ -138,8 +146,6 @@ public:
                   << std::setw(18) << "Categoria"
                   << std::endl;
         std::cout << std::string(86, '-') << std::endl;
-
-        // Linhas
         for (const auto& sym : symbols_) {
             std::cout << std::left
                       << std::setw(20) << sym.name
@@ -151,14 +157,24 @@ public:
         }
     }
 
-    /** @brief Retorna referência constante ao vetor interno de símbolos. */
     const std::vector<Symbol>& getSymbols() const { return symbols_; }
-
-    /** @brief Retorna a quantidade de símbolos registrados. */
     size_t size() const { return symbols_.size(); }
 
 private:
-    std::vector<Symbol> symbols_;  // Armazenamento sequencial dos símbolos
+    std::vector<Symbol> symbols_;
+
+    const Symbol* lookupInherited(const std::string& name, const std::string& className) const {
+        for (auto& sym : symbols_) {
+            if (sym.name == name && sym.scope == className &&
+                sym.category == SymbolCategory::INSTANCE_VAR)
+                return &sym;
+        }
+        const Symbol* cls = lookupClass(className);
+        if (cls && !cls->parent.empty()) {
+            return lookupInherited(name, cls->parent);
+        }
+        return nullptr;
+    }
 };
 
 #endif // SYMBOL_TABLE_H
