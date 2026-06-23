@@ -13,6 +13,17 @@
  *
  * Tecnica: lookahead de 1 token (LL(1)) -- usa currentType() para
  * decidir qual producao seguir em cada ponto da gramatica.
+ *
+ * Gramatica de expressoes (por precedencia crescente):
+ *   Exp      -> And_exp
+ *   And_exp  -> Rel_exp And'_exp        (&&)
+ *   Rel_exp  -> Add_exp Rel'_exp        (<)
+ *   Add_exp  -> Mul_exp Add'_exp        (+ -)
+ *   Mul_exp  -> Un_exp  Mul'_exp        (*)
+ *   Un_exp   -> ! Un_exp | Psf_exp
+ *   Psf_exp  -> Pri_exp Psf'_exp        ([idx], .length, .id())
+ *   Pri_exp  -> ( Exp ) | true | false | Id | Number | this
+ *              | new Id() | new int[Exp]
  */
 
 #ifndef PARSER_H
@@ -25,13 +36,14 @@
 #include <iostream>
 #include <sstream>
 
-class Parser {
+class Parser
+{
 public:
     /**
      * @brief Construtor -- recebe a lista de tokens do lexer.
      * Inicializa o cursor (pos_) no inicio e sem erros.
      */
-    Parser(const std::vector<Token>& tokens) : tokens_(tokens), pos_(0), hadError_(false) {}
+    Parser(const std::vector<Token> &tokens) : tokens_(tokens), pos_(0), hadError_(false) {}
 
     /**
      * @brief Ponto de entrada da analise sintatica.
@@ -39,9 +51,11 @@ public:
      * se todos os tokens foram consumidos (espera END_OF_FILE).
      * @return true se o programa e sintaticamente correto
      */
-    bool parse() {
+    bool parse()
+    {
         parseProg();
-        if (!hadError_) {
+        if (!hadError_)
+        {
             match(TokenType::END_OF_FILE);
         }
         return !hadError_;
@@ -49,21 +63,23 @@ public:
 
     bool hadError() const { return hadError_; }
 
-    const SymbolTable& getSymbolTable() const { return symbolTable_; }
+    const SymbolTable &getSymbolTable() const { return symbolTable_; }
 
 private:
-    std::vector<Token> tokens_;    // Lista de tokens recebida do lexer
-    int pos_;                      // Cursor -- indice do token atual
-    bool hadError_;                // Flag: true apos o primeiro erro (para a analise)
-    SymbolTable symbolTable_;      // Tabela de simbolos preenchida durante o parsing
-    std::string currentClass_;     // Nome da classe sendo parseada (escopo atual)
-    std::string currentMethod_;    // Nome do metodo sendo parseado (escopo atual)
+    std::vector<Token> tokens_; // Lista de tokens recebida do lexer
+    int pos_;                   // Cursor -- indice do token atual
+    bool hadError_;             // Flag: true apos o primeiro erro (para a analise)
+    SymbolTable symbolTable_;   // Tabela de simbolos preenchida durante o parsing
+    std::string currentClass_;  // Nome da classe sendo parseada (escopo atual)
+    std::string currentMethod_; // Nome do metodo sendo parseado (escopo atual)
 
     // ==================== Funcoes auxiliares ====================
 
     // Retorna o token na posicao atual do cursor (lookahead)
-    Token currentToken() const {
-        if (pos_ < (int)tokens_.size()) {
+    Token currentToken() const
+    {
+        if (pos_ < (int)tokens_.size())
+        {
             return tokens_[pos_];
         }
         Token eof;
@@ -74,98 +90,130 @@ private:
     }
 
     // Alias para currentToken()
-    Token peek() const {
+    Token peek() const
+    {
         return currentToken();
     }
 
     // Retorna o tipo do token atual (usado para decisoes de lookahead)
-    TokenType currentType() const {
+    TokenType currentType() const
+    {
         return currentToken().type;
     }
 
     // Avanca o cursor para o proximo token
-    void advance() {
-        if (pos_ < (int)tokens_.size()) {
+    void advance()
+    {
+        if (pos_ < (int)tokens_.size())
+        {
             pos_++;
         }
     }
 
     // Consome o token atual se for do tipo esperado, senao reporta erro
-    void match(TokenType expected) {
-        if (currentType() == expected) {
+    void match(TokenType expected)
+    {
+        if (currentType() == expected)
+        {
             advance();
-        } else {
+        }
+        else
+        {
             error(expected);
         }
     }
 
     // Consome o token esperado e retorna seu lexema (usado para capturar nomes)
-    std::string matchAndGet(TokenType expected) {
-        if (currentType() == expected) {
+    std::string matchAndGet(TokenType expected)
+    {
+        if (currentType() == expected)
+        {
             std::string lex = currentToken().lexeme;
             advance();
             return lex;
-        } else {
+        }
+        else
+        {
             error(expected);
             return "";
         }
     }
 
     // Retorna o escopo atual formatado (ex: "Factorial.compute")
-    std::string currentScope() const {
-        if (currentMethod_.empty()) {
+    std::string currentScope() const
+    {
+        if (currentMethod_.empty())
+        {
             return currentClass_;
         }
         return currentClass_ + "." + currentMethod_;
     }
 
     // Reporta erro sintatico indicando token esperado vs encontrado
-    void error(TokenType expected) {
-        if (hadError_) return;
+    void error(TokenType expected)
+    {
+        if (hadError_)
+            return;
         hadError_ = true;
         Token tok = currentToken();
         std::cerr << "Erro sintático na linha " << tok.line << ": "
                   << "esperado " << tokenTypeToString(expected)
                   << " mas encontrou " << tokenTypeToString(tok.type);
-        if (tok.type == TokenType::ID || tok.type == TokenType::NUMBER) {
+        if (tok.type == TokenType::ID || tok.type == TokenType::NUMBER)
+        {
             std::cerr << " (\"" << tok.lexeme << "\")";
         }
         std::cerr << std::endl;
     }
 
-    void error(const std::string& msg) {
-        if (hadError_) return;
+    void error(const std::string &msg)
+    {
+        if (hadError_)
+            return;
         hadError_ = true;
         Token tok = currentToken();
         std::cerr << "Erro sintático na linha " << tok.line << ": " << msg;
         std::cerr << " (encontrou " << tokenTypeToString(tok.type);
-        if (tok.type == TokenType::ID || tok.type == TokenType::NUMBER) {
+        if (tok.type == TokenType::ID || tok.type == TokenType::NUMBER)
+        {
             std::cerr << " \"" << tok.lexeme << "\"";
         }
         std::cerr << ")" << std::endl;
     }
 
     // Parseia um tipo (int, int[], boolean, ou Id) e retorna como string
-    std::string parseTypeAndGet() {
-        if (hadError_) return "";
-        if (currentType() == TokenType::INT) {
+    std::string parseTypeAndGet()
+    {
+        if (hadError_)
+            return "";
+        if (currentType() == TokenType::INT)
+        {
             match(TokenType::INT);
-            if (hadError_) return "";
-            if (currentType() == TokenType::LBRACKET) {
+            if (hadError_)
+                return "";
+            if (currentType() == TokenType::LBRACKET)
+            {
                 match(TokenType::LBRACKET);
-                if (hadError_) return "";
+                if (hadError_)
+                    return "";
                 match(TokenType::RBRACKET);
                 return "int[]";
             }
             return "int";
-        } else if (currentType() == TokenType::BOOLEAN) {
+        }
+        else if (currentType() == TokenType::BOOLEAN)
+        {
             match(TokenType::BOOLEAN);
             return "boolean";
-        } else if (currentType() == TokenType::ID) {
+        }
+        else if (currentType() == TokenType::ID)
+        {
             std::string typeName = currentToken().lexeme;
             match(TokenType::ID);
             return typeName;
-        } else {
+        }
+        else
+        {
             error("esperado um tipo (int, boolean, int[] ou identificador)");
             return "";
         }
@@ -177,59 +225,84 @@ private:
     // "lambda" indica producao vazia (a funcao simplesmente retorna).
 
     // Prog -> MainC DefCl
-    void parseProg() {
+    void parseProg()
+    {
         parseMainC();
-        if (hadError_) return;
+        if (hadError_)
+            return;
         parseDefCl();
     }
 
-    // MainC -> 'class' Id '{' 'public' 'static' 'void' 'main' '(' 'String' '[' ']' Id ')' '{' CmdList '}' '}'
+    // MainC -> 'class' Id '{' 'public' 'static' 'void' 'main' '(' 'String' '[' ']' Id ')' '{' L_com '}' '}'
     // Parseia a classe principal (que contem o metodo main)
-    void parseMainC() {
+    void parseMainC()
+    {
         match(TokenType::CLASS);
-        if (hadError_) return;
+        if (hadError_)
+            return;
 
         std::string className = matchAndGet(TokenType::ID);
-        if (hadError_) return;
+        if (hadError_)
+            return;
         int classLine = tokens_[pos_ - 1].line;
         currentClass_ = className;
         symbolTable_.addSymbol(className, "class", "global", classLine, SymbolCategory::CLASS);
 
         match(TokenType::LBRACE);
-        if (hadError_) return;
+        if (hadError_)
+            return;
         match(TokenType::PUBLIC);
-        if (hadError_) return;
+        if (hadError_)
+            return;
         match(TokenType::STATIC);
-        if (hadError_) return;
+        if (hadError_)
+            return;
         match(TokenType::VOID);
-        if (hadError_) return;
+        if (hadError_)
+            return;
         match(TokenType::MAIN);
-        if (hadError_) return;
+        if (hadError_)
+            return;
 
         currentMethod_ = "main";
         symbolTable_.addSymbol("main", "void", currentClass_, tokens_[pos_ - 1].line, SymbolCategory::METHOD);
 
         match(TokenType::LPAREN);
-        if (hadError_) return;
+        if (hadError_)
+            return;
         match(TokenType::STRING);
-        if (hadError_) return;
+        if (hadError_)
+            return;
         match(TokenType::LBRACKET);
-        if (hadError_) return;
+        if (hadError_)
+            return;
         match(TokenType::RBRACKET);
-        if (hadError_) return;
+        if (hadError_)
+            return;
 
         std::string paramName = matchAndGet(TokenType::ID);
-        if (hadError_) return;
+        if (hadError_)
+            return;
         symbolTable_.addSymbol(paramName, "String[]", currentScope(), tokens_[pos_ - 1].line, SymbolCategory::PARAMETER);
 
         match(TokenType::RPAREN);
-        if (hadError_) return;
+        if (hadError_)
+            return;
         match(TokenType::LBRACE);
-        if (hadError_) return;
-        parseCmdList();
-        if (hadError_) return;
+        if (hadError_)
+            return;
+
+        // L_com dentro do main pode ser vazia (sem comandos antes do })
+        if (isCmdStart())
+        {
+            parseCmdList();
+            if (hadError_)
+                return;
+        }
+
         match(TokenType::RBRACE);
-        if (hadError_) return;
+        if (hadError_)
+            return;
         match(TokenType::RBRACE);
 
         currentMethod_ = "";
@@ -238,14 +311,19 @@ private:
 
     // DefCl -> 'class' Id DefCl' | lambda
     // Parseia zero ou mais definicoes de classe apos a classe principal
-    void parseDefCl() {
-        if (hadError_) return;
-        if (currentType() == TokenType::CLASS) {
+    void parseDefCl()
+    {
+        if (hadError_)
+            return;
+        if (currentType() == TokenType::CLASS)
+        {
             match(TokenType::CLASS);
-            if (hadError_) return;
+            if (hadError_)
+                return;
 
             std::string className = matchAndGet(TokenType::ID);
-            if (hadError_) return;
+            if (hadError_)
+                return;
             int classLine = tokens_[pos_ - 1].line;
             currentClass_ = className;
             symbolTable_.addSymbol(className, "class", "global", classLine, SymbolCategory::CLASS);
@@ -253,128 +331,176 @@ private:
             parseDefClTail();
             currentClass_ = "";
         }
-        // λ
+        // lambda
     }
 
-    // DefCl' -> '{' DefVar DefMet '}' DefCl
-    //          | 'extends' Id '{' DefVar DefMet '}' DefCl
+    // DefCl' -> '{' DefV DefM '}' DefCl
+    //          | 'extends' Id '{' DefV DefM '}' DefCl
     // Corpo da classe: pode ter heranca (extends) ou nao
-    void parseDefClTail() {
-        if (hadError_) return;
-        if (currentType() == TokenType::LBRACE) {
+    void parseDefClTail()
+    {
+        if (hadError_)
+            return;
+        if (currentType() == TokenType::LBRACE)
+        {
             match(TokenType::LBRACE);
-            if (hadError_) return;
+            if (hadError_)
+                return;
             parseDefVar(SymbolCategory::INSTANCE_VAR);
-            if (hadError_) return;
+            if (hadError_)
+                return;
             parseDefMet();
-            if (hadError_) return;
+            if (hadError_)
+                return;
             match(TokenType::RBRACE);
-            if (hadError_) return;
+            if (hadError_)
+                return;
             parseDefCl();
-        } else if (currentType() == TokenType::EXTENDS) {
+        }
+        else if (currentType() == TokenType::EXTENDS)
+        {
             match(TokenType::EXTENDS);
-            if (hadError_) return;
+            if (hadError_)
+                return;
             match(TokenType::ID);
-            if (hadError_) return;
+            if (hadError_)
+                return;
             match(TokenType::LBRACE);
-            if (hadError_) return;
+            if (hadError_)
+                return;
             parseDefVar(SymbolCategory::INSTANCE_VAR);
-            if (hadError_) return;
+            if (hadError_)
+                return;
             parseDefMet();
-            if (hadError_) return;
+            if (hadError_)
+                return;
             match(TokenType::RBRACE);
-            if (hadError_) return;
+            if (hadError_)
+                return;
             parseDefCl();
-        } else {
+        }
+        else
+        {
             error("esperado '{' ou 'extends' após nome da classe");
         }
     }
 
-    // DefVar -> Type Id ';' DefVar | lambda
+    // DefV -> Type Id ';' DefV | lambda
     // Parseia declaracoes de variaveis. Usa lookahead para distinguir
     // declaracao de variavel (Type Id ;) de inicio de metodo ou comando.
     // O parametro varCategory indica se e variavel de instancia ou local.
-    void parseDefVar(SymbolCategory varCategory) {
-        if (hadError_) return;
-        if (isTypeStart()) {
+    void parseDefVar(SymbolCategory varCategory)
+    {
+        if (hadError_)
+            return;
+        if (isTypeStart())
+        {
             int savedPos = pos_;
             bool savedError = hadError_;
 
-            if (currentType() == TokenType::INT) {
+            if (currentType() == TokenType::INT)
+            {
                 advance();
-                if (currentType() == TokenType::LBRACKET) {
+                if (currentType() == TokenType::LBRACKET)
+                {
                     advance();
-                    if (currentType() == TokenType::RBRACKET) {
+                    if (currentType() == TokenType::RBRACKET)
+                    {
                         advance();
-                        if (currentType() == TokenType::ID) {
+                        if (currentType() == TokenType::ID)
+                        {
                             advance();
-                            if (currentType() == TokenType::SEMICOLON) {
+                            if (currentType() == TokenType::SEMICOLON)
+                            {
                                 pos_ = savedPos;
                                 hadError_ = savedError;
                                 std::string type = parseTypeAndGet();
-                                if (hadError_) return;
+                                if (hadError_)
+                                    return;
                                 std::string name = matchAndGet(TokenType::ID);
-                                if (hadError_) return;
+                                if (hadError_)
+                                    return;
                                 int line = tokens_[pos_ - 1].line;
                                 symbolTable_.addSymbol(name, type, currentScope(), line, varCategory);
                                 match(TokenType::SEMICOLON);
-                                if (hadError_) return;
+                                if (hadError_)
+                                    return;
                                 parseDefVar(varCategory);
                                 return;
                             }
                         }
                     }
-                } else if (currentType() == TokenType::ID) {
+                }
+                else if (currentType() == TokenType::ID)
+                {
                     advance();
-                    if (currentType() == TokenType::SEMICOLON) {
+                    if (currentType() == TokenType::SEMICOLON)
+                    {
                         pos_ = savedPos;
                         hadError_ = savedError;
                         std::string type = parseTypeAndGet();
-                        if (hadError_) return;
+                        if (hadError_)
+                            return;
                         std::string name = matchAndGet(TokenType::ID);
-                        if (hadError_) return;
+                        if (hadError_)
+                            return;
                         int line = tokens_[pos_ - 1].line;
                         symbolTable_.addSymbol(name, type, currentScope(), line, varCategory);
                         match(TokenType::SEMICOLON);
-                        if (hadError_) return;
+                        if (hadError_)
+                            return;
                         parseDefVar(varCategory);
                         return;
                     }
                 }
-            } else if (currentType() == TokenType::BOOLEAN) {
+            }
+            else if (currentType() == TokenType::BOOLEAN)
+            {
                 advance();
-                if (currentType() == TokenType::ID) {
+                if (currentType() == TokenType::ID)
+                {
                     advance();
-                    if (currentType() == TokenType::SEMICOLON) {
+                    if (currentType() == TokenType::SEMICOLON)
+                    {
                         pos_ = savedPos;
                         hadError_ = savedError;
                         std::string type = parseTypeAndGet();
-                        if (hadError_) return;
+                        if (hadError_)
+                            return;
                         std::string name = matchAndGet(TokenType::ID);
-                        if (hadError_) return;
+                        if (hadError_)
+                            return;
                         int line = tokens_[pos_ - 1].line;
                         symbolTable_.addSymbol(name, type, currentScope(), line, varCategory);
                         match(TokenType::SEMICOLON);
-                        if (hadError_) return;
+                        if (hadError_)
+                            return;
                         parseDefVar(varCategory);
                         return;
                     }
                 }
-            } else if (currentType() == TokenType::ID) {
+            }
+            else if (currentType() == TokenType::ID)
+            {
                 advance();
-                if (currentType() == TokenType::ID) {
+                if (currentType() == TokenType::ID)
+                {
                     advance();
-                    if (currentType() == TokenType::SEMICOLON) {
+                    if (currentType() == TokenType::SEMICOLON)
+                    {
                         pos_ = savedPos;
                         hadError_ = savedError;
                         std::string type = parseTypeAndGet();
-                        if (hadError_) return;
+                        if (hadError_)
+                            return;
                         std::string name = matchAndGet(TokenType::ID);
-                        if (hadError_) return;
+                        if (hadError_)
+                            return;
                         int line = tokens_[pos_ - 1].line;
                         symbolTable_.addSymbol(name, type, currentScope(), line, varCategory);
                         match(TokenType::SEMICOLON);
-                        if (hadError_) return;
+                        if (hadError_)
+                            return;
                         parseDefVar(varCategory);
                         return;
                     }
@@ -384,361 +510,640 @@ private:
             pos_ = savedPos;
             hadError_ = savedError;
         }
-        // λ
+        // lambda
     }
 
-    // DefMet -> 'public' Type Id '(' Args ')' '{' DefVar CmdList 'return' Exp ';' '}' DefMet | lambda
+    // DefM -> 'public' Type Id '(' DefM' | lambda
     // Parseia zero ou mais definicoes de metodo dentro de uma classe
-    void parseDefMet() {
-        if (hadError_) return;
-        if (currentType() == TokenType::PUBLIC) {
+    void parseDefMet()
+    {
+        if (hadError_)
+            return;
+        if (currentType() == TokenType::PUBLIC)
+        {
             match(TokenType::PUBLIC);
-            if (hadError_) return;
+            if (hadError_)
+                return;
 
             std::string retType = parseTypeAndGet();
-            if (hadError_) return;
+            if (hadError_)
+                return;
 
             std::string methodName = matchAndGet(TokenType::ID);
-            if (hadError_) return;
+            if (hadError_)
+                return;
             int methodLine = tokens_[pos_ - 1].line;
             currentMethod_ = methodName;
             symbolTable_.addSymbol(methodName, retType, currentClass_, methodLine, SymbolCategory::METHOD);
 
             match(TokenType::LPAREN);
-            if (hadError_) return;
+            if (hadError_)
+                return;
             parseDefMetArgs();
-            if (hadError_) return;
+            if (hadError_)
+                return;
             match(TokenType::RPAREN);
-            if (hadError_) return;
+            if (hadError_)
+                return;
             match(TokenType::LBRACE);
-            if (hadError_) return;
+            if (hadError_)
+                return;
             parseDefVar(SymbolCategory::LOCAL_VAR);
-            if (hadError_) return;
-            parseCmdList();
-            if (hadError_) return;
+            if (hadError_)
+                return;
+
+            // L_com dentro do metodo pode ser vazia (so tem return)
+            if (isCmdStart())
+            {
+                parseCmdList();
+                if (hadError_)
+                    return;
+            }
+
             match(TokenType::RETURN);
-            if (hadError_) return;
+            if (hadError_)
+                return;
             parseExp();
-            if (hadError_) return;
+            if (hadError_)
+                return;
             match(TokenType::SEMICOLON);
-            if (hadError_) return;
+            if (hadError_)
+                return;
             match(TokenType::RBRACE);
-            if (hadError_) return;
+            if (hadError_)
+                return;
 
             currentMethod_ = "";
             parseDefMet();
         }
-        // λ
+        // lambda
     }
 
     // DefMetArgs -> Args | lambda
     // Parseia os parametros formais de um metodo (pode ser vazio)
-    void parseDefMetArgs() {
-        if (hadError_) return;
-        if (isTypeStart()) {
+    void parseDefMetArgs()
+    {
+        if (hadError_)
+            return;
+        if (isTypeStart())
+        {
             parseArgs();
         }
-        // λ
-    }
-
-    // Type -> 'int' '[' ']' | 'boolean' | 'int' | Id
-    void parseType() {
-        if (hadError_) return;
-        if (currentType() == TokenType::INT) {
-            match(TokenType::INT);
-            if (hadError_) return;
-            if (currentType() == TokenType::LBRACKET) {
-                match(TokenType::LBRACKET);
-                if (hadError_) return;
-                match(TokenType::RBRACKET);
-            }
-        } else if (currentType() == TokenType::BOOLEAN) {
-            match(TokenType::BOOLEAN);
-        } else if (currentType() == TokenType::ID) {
-            match(TokenType::ID);
-        } else {
-            error("esperado um tipo (int, boolean, int[] ou identificador)");
-        }
+        // lambda
     }
 
     // Args -> Type Id Args'
     // Parseia lista de parametros e registra cada um na tabela de simbolos
-    void parseArgs() {
-        if (hadError_) return;
+    void parseArgs()
+    {
+        if (hadError_)
+            return;
         std::string type = parseTypeAndGet();
-        if (hadError_) return;
+        if (hadError_)
+            return;
         std::string name = matchAndGet(TokenType::ID);
-        if (hadError_) return;
+        if (hadError_)
+            return;
         int line = tokens_[pos_ - 1].line;
         symbolTable_.addSymbol(name, type, currentScope(), line, SymbolCategory::PARAMETER);
         parseArgsTail();
     }
 
     // Args' -> ',' Args | lambda
-    void parseArgsTail() {
-        if (hadError_) return;
-        if (currentType() == TokenType::COMMA) {
+    void parseArgsTail()
+    {
+        if (hadError_)
+            return;
+        if (currentType() == TokenType::COMMA)
+        {
             match(TokenType::COMMA);
-            if (hadError_) return;
+            if (hadError_)
+                return;
             parseArgs();
         }
-        // λ
+        // lambda
     }
 
-    // Cmd -> '{' CmdList '}'
-    //       | 'if' '(' Exp ')' Cmd 'else' Cmd
-    //       | 'while' '(' Exp ')' Cmd
-    //       | 'System' '.' 'out' '.' 'println' '(' Exp ')' ';'
-    //       | Id Cmd'
+    // ==================== Comandos ====================
+
+    // Com -> Id Com_Ass
+    //      | 'if' '(' Exp ')' '{' L_com '}' I
+    //      | 'while' '(' Exp ')' '{' L_com '}'
+    //      | 'System' '.' 'out' '.' 'println' '(' Exp ')' ';'
     // Usa o token atual (lookahead) para decidir qual alternativa seguir
-    void parseCmd() {
-        if (hadError_) return;
-        if (currentType() == TokenType::LBRACE) {
-            match(TokenType::LBRACE);
-            if (hadError_) return;
-            parseCmdList();
-            if (hadError_) return;
-            match(TokenType::RBRACE);
-        } else if (currentType() == TokenType::IF) {
-            match(TokenType::IF);
-            if (hadError_) return;
-            match(TokenType::LPAREN);
-            if (hadError_) return;
-            parseExp();
-            if (hadError_) return;
-            match(TokenType::RPAREN);
-            if (hadError_) return;
-            parseCmd();
-            if (hadError_) return;
-            match(TokenType::ELSE);
-            if (hadError_) return;
-            parseCmd();
-        } else if (currentType() == TokenType::WHILE) {
-            match(TokenType::WHILE);
-            if (hadError_) return;
-            match(TokenType::LPAREN);
-            if (hadError_) return;
-            parseExp();
-            if (hadError_) return;
-            match(TokenType::RPAREN);
-            if (hadError_) return;
-            parseCmd();
-        } else if (currentType() == TokenType::SYSTEM) {
-            match(TokenType::SYSTEM);
-            if (hadError_) return;
-            match(TokenType::DOT);
-            if (hadError_) return;
-            match(TokenType::OUT);
-            if (hadError_) return;
-            match(TokenType::DOT);
-            if (hadError_) return;
-            match(TokenType::PRINTLN);
-            if (hadError_) return;
-            match(TokenType::LPAREN);
-            if (hadError_) return;
-            parseExp();
-            if (hadError_) return;
-            match(TokenType::RPAREN);
-            if (hadError_) return;
-            match(TokenType::SEMICOLON);
-        } else if (currentType() == TokenType::ID) {
+    void parseCmd()
+    {
+        if (hadError_)
+            return;
+        if (currentType() == TokenType::ID)
+        {
             match(TokenType::ID);
-            if (hadError_) return;
+            if (hadError_)
+                return;
             parseCmdTail();
-        } else {
-            error("esperado um comando ('{', 'if', 'while', 'System' ou identificador)");
+        }
+        else if (currentType() == TokenType::IF)
+        {
+            match(TokenType::IF);
+            if (hadError_)
+                return;
+            match(TokenType::LPAREN);
+            if (hadError_)
+                return;
+            parseExp();
+            if (hadError_)
+                return;
+            match(TokenType::RPAREN);
+            if (hadError_)
+                return;
+            match(TokenType::LBRACE);
+            if (hadError_)
+                return;
+            parseCmdList();
+            if (hadError_)
+                return;
+            match(TokenType::RBRACE);
+            if (hadError_)
+                return;
+            parseI(); // else opcional
+        }
+        else if (currentType() == TokenType::WHILE)
+        {
+            match(TokenType::WHILE);
+            if (hadError_)
+                return;
+            match(TokenType::LPAREN);
+            if (hadError_)
+                return;
+            parseExp();
+            if (hadError_)
+                return;
+            match(TokenType::RPAREN);
+            if (hadError_)
+                return;
+            match(TokenType::LBRACE);
+            if (hadError_)
+                return;
+            parseCmdList();
+            if (hadError_)
+                return;
+            match(TokenType::RBRACE);
+        }
+        else if (currentType() == TokenType::SYSTEM)
+        {
+            match(TokenType::SYSTEM);
+            if (hadError_)
+                return;
+            match(TokenType::DOT);
+            if (hadError_)
+                return;
+            match(TokenType::OUT);
+            if (hadError_)
+                return;
+            match(TokenType::DOT);
+            if (hadError_)
+                return;
+            match(TokenType::PRINTLN);
+            if (hadError_)
+                return;
+            match(TokenType::LPAREN);
+            if (hadError_)
+                return;
+            parseExp();
+            if (hadError_)
+                return;
+            match(TokenType::RPAREN);
+            if (hadError_)
+                return;
+            match(TokenType::SEMICOLON);
+        }
+        else
+        {
+            error("esperado um comando ('if', 'while', 'System' ou identificador)");
         }
     }
 
-    // Cmd' -> '=' Exp ';'           (atribuicao simples)
-    //        | '[' Exp ']' '=' Exp ';'  (atribuicao em array)
-    void parseCmdTail() {
-        if (hadError_) return;
-        if (currentType() == TokenType::ASSIGN) {
+    // Com_Ass -> '=' Exp ';'            (atribuicao simples: id = exp;)
+    //          | '[' Exp ']' '=' Exp ';' (atribuicao em array: id[exp] = exp;)
+    void parseCmdTail()
+    {
+        if (hadError_)
+            return;
+        if (currentType() == TokenType::ASSIGN)
+        {
             match(TokenType::ASSIGN);
-            if (hadError_) return;
+            if (hadError_)
+                return;
             parseExp();
-            if (hadError_) return;
+            if (hadError_)
+                return;
             match(TokenType::SEMICOLON);
-        } else if (currentType() == TokenType::LBRACKET) {
+        }
+        else if (currentType() == TokenType::LBRACKET)
+        {
             match(TokenType::LBRACKET);
-            if (hadError_) return;
+            if (hadError_)
+                return;
             parseExp();
-            if (hadError_) return;
+            if (hadError_)
+                return;
             match(TokenType::RBRACKET);
-            if (hadError_) return;
+            if (hadError_)
+                return;
             match(TokenType::ASSIGN);
-            if (hadError_) return;
+            if (hadError_)
+                return;
             parseExp();
-            if (hadError_) return;
+            if (hadError_)
+                return;
             match(TokenType::SEMICOLON);
-        } else {
+        }
+        else
+        {
             error("esperado '=' ou '[' após identificador em comando");
         }
     }
 
-    // CmdList -> Cmd CmdList | lambda
-    // Parseia zero ou mais comandos em sequencia
-    void parseCmdList() {
-        if (hadError_) return;
-        if (isCmdStart()) {
+    // L_com -> Com L'_com  (um ou mais comandos)
+    void parseCmdList()
+    {
+        if (hadError_)
+            return;
+        parseCmd();
+        if (hadError_)
+            return;
+        parseCmdListTail();
+    }
+
+    // L'_com -> Com L'_com | lambda
+    void parseCmdListTail()
+    {
+        if (hadError_)
+            return;
+        if (isCmdStart())
+        {
             parseCmd();
-            if (hadError_) return;
+            if (hadError_)
+                return;
+            parseCmdListTail();
+        }
+        // lambda
+    }
+
+    // I -> 'else' '{' L_com '}' | lambda
+    // O else e opcional na nova gramatica
+    void parseI()
+    {
+        if (hadError_)
+            return;
+        if (currentType() == TokenType::ELSE)
+        {
+            match(TokenType::ELSE);
+            if (hadError_)
+                return;
+            match(TokenType::LBRACE);
+            if (hadError_)
+                return;
             parseCmdList();
+            if (hadError_)
+                return;
+            match(TokenType::RBRACE);
         }
-        // λ
+        // lambda
     }
 
-    // Exp -> PrimExp Exp'
-    // Expressao: uma expressao primaria seguida de operacoes opcionais
-    void parseExp() {
-        if (hadError_) return;
-        parsePrimExp();
-        if (hadError_) return;
-        parseExpTail();
+    // ==================== Expressoes (por precedencia) ====================
+    //
+    // A nova gramatica estratifica operadores em niveis de precedencia
+    // explícitos, em vez de um Exp' flat. A cadeia e:
+    //
+    //   Exp -> And_exp -> Rel_exp -> Add_exp -> Mul_exp -> Un_exp -> Psf_exp -> Pri_exp
+    //
+    // Cada nivel so "ve" os operadores do seu nivel; operadores de menor
+    // precedencia ficam nos niveis acima.
+
+    // Exp -> And_exp
+    void parseExp()
+    {
+        if (hadError_)
+            return;
+        parseAndExp();
     }
 
-    // Exp' -> Op PrimExp Exp' | '[' Exp ']' Exp' | '.' PostExpDot | lambda
-    // Cauda da expressao: operador binario, acesso a array, ou chamada de metodo
-    void parseExpTail() {
-        if (hadError_) return;
-        if (isOp()) {
-            parseOp();
-            if (hadError_) return;
-            parsePrimExp();
-            if (hadError_) return;
-            parseExpTail();
-        } else if (currentType() == TokenType::LBRACKET) {
-            match(TokenType::LBRACKET);
-            if (hadError_) return;
-            parseExp();
-            if (hadError_) return;
-            match(TokenType::RBRACKET);
-            if (hadError_) return;
-            parseExpTail();
-        } else if (currentType() == TokenType::DOT) {
-            match(TokenType::DOT);
-            if (hadError_) return;
-            parsePostExpDot();
+    // And_exp -> Rel_exp And'_exp
+    void parseAndExp()
+    {
+        if (hadError_)
+            return;
+        parseRelExp();
+        if (hadError_)
+            return;
+        parseAndExpTail();
+    }
+
+    // And'_exp -> '&&' Rel_exp And'_exp | lambda
+    void parseAndExpTail()
+    {
+        if (hadError_)
+            return;
+        if (currentType() == TokenType::AND)
+        {
+            match(TokenType::AND);
+            if (hadError_)
+                return;
+            parseRelExp();
+            if (hadError_)
+                return;
+            parseAndExpTail();
         }
-        // λ
+        // lambda
     }
 
-    // Op -> '&&' | '<' | '>' | '+' | '-' | '*'
-    void parseOp() {
-        if (hadError_) return;
-        if (currentType() == TokenType::AND || currentType() == TokenType::LT ||
-            currentType() == TokenType::GT || currentType() == TokenType::PLUS ||
-            currentType() == TokenType::MINUS || currentType() == TokenType::MULT) {
+    // Rel_exp -> Add_exp Rel'_exp
+    void parseRelExp()
+    {
+        if (hadError_)
+            return;
+        parseAddExp();
+        if (hadError_)
+            return;
+        parseRelExpTail();
+    }
+
+    // Rel'_exp -> '<' Add_exp Rel'_exp | lambda
+    void parseRelExpTail()
+    {
+        if (hadError_)
+            return;
+        if (currentType() == TokenType::LT)
+        {
+            match(TokenType::LT);
+            if (hadError_)
+                return;
+            parseAddExp();
+            if (hadError_)
+                return;
+            parseRelExpTail();
+        }
+        // lambda
+    }
+
+    // Add_exp -> Mul_exp Add'_exp
+    void parseAddExp()
+    {
+        if (hadError_)
+            return;
+        parseMulExp();
+        if (hadError_)
+            return;
+        parseAddExpTail();
+    }
+
+    // Add'_exp -> '+' Mul_exp Add'_exp | '-' Mul_exp Add'_exp | lambda
+    void parseAddExpTail()
+    {
+        if (hadError_)
+            return;
+        if (currentType() == TokenType::PLUS || currentType() == TokenType::MINUS)
+        {
             advance();
-        } else {
-            error("esperado um operador (&&, <, >, +, -, *)");
+            if (hadError_)
+                return;
+            parseMulExp();
+            if (hadError_)
+                return;
+            parseAddExpTail();
         }
+        // lambda
     }
 
-    // PostExpDot -> 'length' Exp' | Id '(' ListExp ')' Exp'
-    // Apos um '.': acesso a .length ou chamada de metodo
-    void parsePostExpDot() {
-        if (hadError_) return;
-        if (currentType() == TokenType::LENGTH) {
-            match(TokenType::LENGTH);
-            if (hadError_) return;
-            parseExpTail();
-        } else if (currentType() == TokenType::ID) {
-            match(TokenType::ID);
-            if (hadError_) return;
-            match(TokenType::LPAREN);
-            if (hadError_) return;
-            parseListExp();
-            if (hadError_) return;
-            match(TokenType::RPAREN);
-            if (hadError_) return;
-            parseExpTail();
-        } else {
-            error("esperado 'length' ou identificador de método após '.'");
-        }
+    // Mul_exp -> Un_exp Mul'_exp
+    void parseMulExp()
+    {
+        if (hadError_)
+            return;
+        parseUnExp();
+        if (hadError_)
+            return;
+        parseMulExpTail();
     }
 
-    // ListExp -> Exp ListExp' | lambda
-    // Lista de argumentos em chamada de metodo (pode ser vazia)
-    void parseListExp() {
-        if (hadError_) return;
-        if (isPrimExpStart()) {
-            parseExp();
-            if (hadError_) return;
-            parseListExpTail();
+    // Mul'_exp -> '*' Un_exp Mul'_exp | lambda
+    void parseMulExpTail()
+    {
+        if (hadError_)
+            return;
+        if (currentType() == TokenType::MULT)
+        {
+            match(TokenType::MULT);
+            if (hadError_)
+                return;
+            parseUnExp();
+            if (hadError_)
+                return;
+            parseMulExpTail();
         }
-        // λ
+        // lambda
     }
 
-    // ListExp' -> ',' Exp ListExp' | lambda
-    void parseListExpTail() {
-        if (hadError_) return;
-        if (currentType() == TokenType::COMMA) {
-            match(TokenType::COMMA);
-            if (hadError_) return;
-            parseExp();
-            if (hadError_) return;
-            parseListExpTail();
-        }
-        // λ
-    }
-
-    // PrimExp -> 'new' PrimExp' | '!' Exp | '(' Exp ')'
-    //           | 'true' | 'false' | Id | Number | 'this'
-    // Expressao primaria: o "atomo" de uma expressao
-    void parsePrimExp() {
-        if (hadError_) return;
-        if (currentType() == TokenType::NEW) {
-            match(TokenType::NEW);
-            if (hadError_) return;
-            parsePrimExpTail();
-        } else if (currentType() == TokenType::NOT) {
+    // Un_exp -> '!' Un_exp | Psf_exp
+    // O operador unario '!' e direito-associativo por natureza da recursao
+    void parseUnExp()
+    {
+        if (hadError_)
+            return;
+        if (currentType() == TokenType::NOT)
+        {
             match(TokenType::NOT);
-            if (hadError_) return;
-            parseExp();
-        } else if (currentType() == TokenType::LPAREN) {
-            match(TokenType::LPAREN);
-            if (hadError_) return;
-            parseExp();
-            if (hadError_) return;
-            match(TokenType::RPAREN);
-        } else if (currentType() == TokenType::TRUE) {
-            match(TokenType::TRUE);
-        } else if (currentType() == TokenType::FALSE) {
-            match(TokenType::FALSE);
-        } else if (currentType() == TokenType::ID) {
-            match(TokenType::ID);
-        } else if (currentType() == TokenType::NUMBER) {
-            match(TokenType::NUMBER);
-        } else if (currentType() == TokenType::THIS) {
-            match(TokenType::THIS);
-        } else {
-            error("esperado uma expressão primária (identificador, número, 'true', 'false', 'this', 'new', '!' ou '(')");
+            if (hadError_)
+                return;
+            parseUnExp();
+        }
+        else
+        {
+            parsePsfExp();
         }
     }
 
-    // PrimExp' -> Id '(' ')'        (instanciacao de objeto: new Classe())
-    //            | 'int' '[' Exp ']'  (criacao de array: new int[size])
-    void parsePrimExpTail() {
-        if (hadError_) return;
-        if (currentType() == TokenType::ID) {
-            match(TokenType::ID);
-            if (hadError_) return;
-            match(TokenType::LPAREN);
-            if (hadError_) return;
-            match(TokenType::RPAREN);
-        } else if (currentType() == TokenType::INT) {
-            match(TokenType::INT);
-            if (hadError_) return;
+    // Psf_exp -> Pri_exp Psf'_exp
+    // "Psf" = pos-fixado: acesso a array, .length e chamada de metodo
+    void parsePsfExp()
+    {
+        if (hadError_)
+            return;
+        parsePriExp();
+        if (hadError_)
+            return;
+        parsePsfExpTail();
+    }
+
+    // Psf'_exp -> '[' Exp ']' Psf'_exp
+    //           | '.' 'length' Psf'_exp
+    //           | '.' Id '(' L_exp ')' Psf'_exp
+    //           | lambda
+    void parsePsfExpTail()
+    {
+        if (hadError_)
+            return;
+        if (currentType() == TokenType::LBRACKET)
+        {
             match(TokenType::LBRACKET);
-            if (hadError_) return;
+            if (hadError_)
+                return;
             parseExp();
-            if (hadError_) return;
+            if (hadError_)
+                return;
             match(TokenType::RBRACKET);
-        } else {
-            error("esperado identificador ou 'int' após 'new'");
+            if (hadError_)
+                return;
+            parsePsfExpTail();
         }
+        else if (currentType() == TokenType::DOT)
+        {
+            match(TokenType::DOT);
+            if (hadError_)
+                return;
+            if (currentType() == TokenType::LENGTH)
+            {
+                match(TokenType::LENGTH);
+                if (hadError_)
+                    return;
+                parsePsfExpTail();
+            }
+            else if (currentType() == TokenType::ID)
+            {
+                match(TokenType::ID);
+                if (hadError_)
+                    return;
+                match(TokenType::LPAREN);
+                if (hadError_)
+                    return;
+                parseListExp(); // L_exp (pode ser vazia)
+                if (hadError_)
+                    return;
+                match(TokenType::RPAREN);
+                if (hadError_)
+                    return;
+                parsePsfExpTail();
+            }
+            else
+            {
+                error("esperado 'length' ou identificador de método após '.'");
+            }
+        }
+        // lambda
+    }
+
+    // Pri_exp -> '(' Exp ')'
+    //          | 'true' | 'false' | Id | Number | 'this'
+    //          | 'new' Id '()'
+    //          | 'new' 'int' '[' Exp ']'
+    // Expressao primaria: o "atomo" de uma expressao
+    void parsePriExp()
+    {
+        if (hadError_)
+            return;
+        if (currentType() == TokenType::LPAREN)
+        {
+            match(TokenType::LPAREN);
+            if (hadError_)
+                return;
+            parseExp();
+            if (hadError_)
+                return;
+            match(TokenType::RPAREN);
+        }
+        else if (currentType() == TokenType::TRUE)
+        {
+            match(TokenType::TRUE);
+        }
+        else if (currentType() == TokenType::FALSE)
+        {
+            match(TokenType::FALSE);
+        }
+        else if (currentType() == TokenType::ID)
+        {
+            match(TokenType::ID);
+        }
+        else if (currentType() == TokenType::NUMBER)
+        {
+            match(TokenType::NUMBER);
+        }
+        else if (currentType() == TokenType::THIS)
+        {
+            match(TokenType::THIS);
+        }
+        else if (currentType() == TokenType::NEW)
+        {
+            match(TokenType::NEW);
+            if (hadError_)
+                return;
+            if (currentType() == TokenType::ID)
+            {
+                match(TokenType::ID);
+                if (hadError_)
+                    return;
+                match(TokenType::LPAREN);
+                if (hadError_)
+                    return;
+                match(TokenType::RPAREN);
+            }
+            else if (currentType() == TokenType::INT)
+            {
+                match(TokenType::INT);
+                if (hadError_)
+                    return;
+                match(TokenType::LBRACKET);
+                if (hadError_)
+                    return;
+                parseExp();
+                if (hadError_)
+                    return;
+                match(TokenType::RBRACKET);
+            }
+            else
+            {
+                error("esperado identificador ou 'int' após 'new'");
+            }
+        }
+        else
+        {
+            error("esperado uma expressão primária (identificador, número, 'true', 'false', 'this', 'new' ou '(')");
+        }
+    }
+
+    // L_exp -> Exp L'_exp | lambda
+    // Lista de argumentos em chamada de metodo (pode ser vazia)
+    void parseListExp()
+    {
+        if (hadError_)
+            return;
+        if (isPriExpStart())
+        {
+            parseExp();
+            if (hadError_)
+                return;
+            parseListExpTail();
+        }
+        // lambda
+    }
+
+    // L'_exp -> ',' Exp L'_exp | lambda
+    void parseListExpTail()
+    {
+        if (hadError_)
+            return;
+        if (currentType() == TokenType::COMMA)
+        {
+            match(TokenType::COMMA);
+            if (hadError_)
+                return;
+            parseExp();
+            if (hadError_)
+                return;
+            parseListExpTail();
+        }
+        // lambda
     }
 
     // ==================== Conjuntos FIRST ====================
@@ -746,41 +1151,38 @@ private:
     // de uma producao. Usadas para decidir qual alternativa seguir.
 
     // FIRST(Type) = { int, boolean, ID }
-    bool isTypeStart() const {
+    bool isTypeStart() const
+    {
         return currentType() == TokenType::INT ||
                currentType() == TokenType::BOOLEAN ||
                currentType() == TokenType::ID;
     }
 
-    // FIRST(Cmd) = { '{', if, while, System, ID }
-    bool isCmdStart() const {
-        return currentType() == TokenType::LBRACE ||
+    // FIRST(Com) = { ID, if, while, System }
+    // Nota: '{' foi removido — na nova gramatica, blocos so aparecem
+    // dentro de if/while, nao como comando independente.
+    bool isCmdStart() const
+    {
+        return currentType() == TokenType::ID ||
                currentType() == TokenType::IF ||
                currentType() == TokenType::WHILE ||
-               currentType() == TokenType::SYSTEM ||
-               currentType() == TokenType::ID;
+               currentType() == TokenType::SYSTEM;
     }
 
-    // FIRST(Op) = { &&, <, >, +, -, * }
-    bool isOp() const {
-        return currentType() == TokenType::AND ||
-               currentType() == TokenType::LT ||
-               currentType() == TokenType::GT ||
-               currentType() == TokenType::PLUS ||
-               currentType() == TokenType::MINUS ||
-               currentType() == TokenType::MULT;
-    }
-
-    // FIRST(PrimExp) = { new, !, (, true, false, ID, NUMBER, this }
-    bool isPrimExpStart() const {
-        return currentType() == TokenType::NEW ||
-               currentType() == TokenType::NOT ||
+    // FIRST(Pri_exp) = FIRST(Un_exp) = FIRST(Exp)
+    // = { !, (, true, false, ID, NUMBER, this, new }
+    // Nota: '!' entrou aqui pois Un_exp -> ! Un_exp | Psf_exp, e
+    // isPriExpStart() e usado para detectar inicio de qualquer expressao.
+    bool isPriExpStart() const
+    {
+        return currentType() == TokenType::NOT ||
                currentType() == TokenType::LPAREN ||
                currentType() == TokenType::TRUE ||
                currentType() == TokenType::FALSE ||
                currentType() == TokenType::ID ||
                currentType() == TokenType::NUMBER ||
-               currentType() == TokenType::THIS;
+               currentType() == TokenType::THIS ||
+               currentType() == TokenType::NEW;
     }
 };
 
