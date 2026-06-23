@@ -292,13 +292,10 @@ private:
         if (hadError_)
             return;
 
-        // L_com dentro do main pode ser vazia (sem comandos antes do })
-        if (isCmdStart())
-        {
-            parseCmdList();
-            if (hadError_)
-                return;
-        }
+        // L_com não ser vazia
+        parseComList();
+        if (hadError_)
+            return;
 
         match(TokenType::RBRACE);
         if (hadError_)
@@ -552,13 +549,10 @@ private:
             if (hadError_)
                 return;
 
-            // L_com dentro do metodo pode ser vazia (so tem return)
-            if (isCmdStart())
-            {
-                parseCmdList();
-                if (hadError_)
-                    return;
-            }
+            // L_com não pode ser vazio
+            parseComList();
+            if (hadError_)
+                return;
 
             match(TokenType::RETURN);
             if (hadError_)
@@ -631,7 +625,7 @@ private:
     //      | 'while' '(' Exp ')' '{' L_com '}'
     //      | 'System' '.' 'out' '.' 'println' '(' Exp ')' ';'
     // Usa o token atual (lookahead) para decidir qual alternativa seguir
-    void parseCmd()
+    void parseCom()
     {
         if (hadError_)
             return;
@@ -640,7 +634,7 @@ private:
             match(TokenType::ID);
             if (hadError_)
                 return;
-            parseCmdTail();
+            parseComAss();
         }
         else if (currentType() == TokenType::IF)
         {
@@ -659,7 +653,7 @@ private:
             match(TokenType::LBRACE);
             if (hadError_)
                 return;
-            parseCmdList();
+            parseComList();
             if (hadError_)
                 return;
             match(TokenType::RBRACE);
@@ -684,7 +678,7 @@ private:
             match(TokenType::LBRACE);
             if (hadError_)
                 return;
-            parseCmdList();
+            parseComList();
             if (hadError_)
                 return;
             match(TokenType::RBRACE);
@@ -725,7 +719,7 @@ private:
 
     // Com_Ass -> '=' Exp ';'            (atribuicao simples: id = exp;)
     //          | '[' Exp ']' '=' Exp ';' (atribuicao em array: id[exp] = exp;)
-    void parseCmdTail()
+    void parseComAss()
     {
         if (hadError_)
             return;
@@ -765,27 +759,27 @@ private:
     }
 
     // L_com -> Com L'_com  (um ou mais comandos)
-    void parseCmdList()
+    void parseComList()
     {
         if (hadError_)
             return;
-        parseCmd();
+        parseCom();
         if (hadError_)
             return;
-        parseCmdListTail();
+        parseComListTail();
     }
 
-    // L'_com -> Com L'_com | lambda
-    void parseCmdListTail()
+    // L_com' -> Com L_com' | lambda
+    void parseComListTail()
     {
         if (hadError_)
             return;
         if (isCmdStart())
         {
-            parseCmd();
+            parseCom();
             if (hadError_)
                 return;
-            parseCmdListTail();
+            parseComListTail();
         }
         // lambda
     }
@@ -804,7 +798,7 @@ private:
             match(TokenType::LBRACE);
             if (hadError_)
                 return;
-            parseCmdList();
+            parseComList();
             if (hadError_)
                 return;
             match(TokenType::RBRACE);
