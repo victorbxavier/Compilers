@@ -1,0 +1,22 @@
+// Programa simples: verifica se um número é par ou ímpar
+class Main {
+    public static void main(String[] args){
+        System.out.println(new Paridade().verificar(7));
+    }
+}
+
+class Paridade {
+    public int verificar(int num){
+        int metade ;
+        int dobro ;
+        int resultado ;
+        metade = num - (num - num) ;
+        dobro = (num * 2) - num ;
+        if (dobro < num + 1) {
+            resultado = 1 ;
+        } else {
+            resultado = 0 ;
+        }
+        return resultado ;
+    }
+}

@@ -25,11 +25,23 @@ public:
     SemanticAnalyzer(const SymbolTable& table) : table_(table), errorCount_(0) {}
 
     bool analyze(const Program* program) {
-        if (!program) return false;
+        if (!program) {
+            return false;
+        }
 
         // Verifica classes vazias
         for (auto& cls : program->classes) {
             checkClassNotEmpty(cls.get());
+        }
+
+        // Verifica variáveis duplicadas no mesmo escopo
+        checkDuplicateSymbols();
+
+        // Verifica override de métodos (despacho dinâmico)
+        for (auto& cls : program->classes) {
+            if (!cls->parent.empty()) {
+                checkMethodOverrides(cls.get());
+            }
         }
 
         // Verifica cada classe
@@ -71,23 +83,33 @@ private:
     std::string currentMethod_;
 
     std::string currentScope() const {
-        if (currentMethod_.empty()) return currentClass_;
+        if (currentMethod_.empty()) {
+            return currentClass_;
+        }
         return currentClass_ + "." + currentMethod_;
     }
 
     void reportError(int line, const std::string& msg) {
         std::cerr << "Erro semântico";
-        if (line > 0) std::cerr << " na linha " << line;
+        if (line > 0) {
+            std::cerr << " na linha " << line;
+        }
         std::cerr << ": " << msg << std::endl;
         errorCount_++;
     }
 
     bool typesCompatible(const std::string& expected, const std::string& actual) const {
-        if (expected == actual) return true;
-        if (expected == "unknown" || actual == "unknown") return true;  // Não propagar erros
+        if (expected == actual) {
+            return true;
+        }
+        if (expected == "unknown" || actual == "unknown") {
+            return true;  // Não propagar erros
+        }
         // Subtipo: classe filha é compatível com classe pai
         const Symbol* cls = table_.lookupClass(actual);
-        if (cls && !cls->parent.empty() && cls->parent == expected) return true;
+        if (cls && !cls->parent.empty() && cls->parent == expected) {
+            return true;
+        }
         return false;
     }
 
@@ -97,25 +119,91 @@ private:
         }
     }
 
+    // ==================== Verificação de duplicatas (6.3.3) ====================
+
+    void checkDuplicateSymbols() {
+        const auto& symbols = table_.getSymbols();
+        for (size_t i = 0; i < symbols.size(); i++) {
+            for (size_t j = i + 1; j < symbols.size(); j++) {
+                if (symbols[i].name == symbols[j].name &&
+                    symbols[i].scope == symbols[j].scope &&
+                    symbols[i].category == symbols[j].category) {
+                    reportError(symbols[j].line,
+                        "declaração duplicada: '" + symbols[j].name +
+                        "' já declarado no escopo '" + symbols[j].scope + "' (linha " +
+                        std::to_string(symbols[i].line) + ")");
+                }
+            }
+        }
+    }
+
+    // ==================== Verificação de override (6.2.3) ====================
+
+    void checkMethodOverrides(const ClassDecl* cls) {
+        for (auto& method : cls->methods) {
+            // Verifica se o método existe na classe pai
+            const Symbol* parentMethod = table_.lookupMethod(cls->parent, method->name);
+            if (parentMethod) {
+                // Override encontrado — verifica compatibilidade de assinatura
+                std::string childRetType = typeToString(method->returnType.get());
+                if (childRetType != parentMethod->type) {
+                    reportError(method->line,
+                        "override inválido: método '" + method->name + "' em '" + cls->name +
+                        "' retorna " + childRetType + " mas na classe pai '" + cls->parent +
+                        "' retorna " + parentMethod->type);
+                }
+
+                // Verifica número de parâmetros
+                auto parentParams = table_.getMethodParams(cls->parent, method->name);
+                auto childParams = table_.getMethodParams(cls->name, method->name);
+                if (parentParams.size() != childParams.size()) {
+                    reportError(method->line,
+                        "override inválido: método '" + method->name + "' em '" + cls->name +
+                        "' tem " + std::to_string(childParams.size()) + " parâmetro(s) mas na classe pai tem " +
+                        std::to_string(parentParams.size()));
+                } else {
+                    // Verifica tipos dos parâmetros
+                    for (size_t i = 0; i < parentParams.size(); i++) {
+                        if (parentParams[i]->type != childParams[i]->type) {
+                            reportError(method->line,
+                                "override inválido: parâmetro " + std::to_string(i + 1) +
+                                " de '" + method->name + "' em '" + cls->name +
+                                "' é " + childParams[i]->type + " mas na classe pai é " +
+                                parentParams[i]->type);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // ==================== Verificação de comandos ====================
 
     void checkStmt(const Stmt* stmt) {
-        if (!stmt) return;
+        if (!stmt) {
+            return;
+        }
 
         if (auto* ifStmt = dynamic_cast<const IfStmt*>(stmt)) {
             std::string condType = inferExpType(ifStmt->condition.get());
             if (condType != "boolean" && condType != "unknown") {
                 reportError(ifStmt->line, "condição do 'if' deve ser boolean, obteve " + condType);
             }
-            for (auto& s : ifStmt->thenBody) checkStmt(s.get());
-            for (auto& s : ifStmt->elseBody) checkStmt(s.get());
+            for (auto& s : ifStmt->thenBody) {
+                checkStmt(s.get());
+            }
+            for (auto& s : ifStmt->elseBody) {
+                checkStmt(s.get());
+            }
         }
         else if (auto* whileStmt = dynamic_cast<const WhileStmt*>(stmt)) {
             std::string condType = inferExpType(whileStmt->condition.get());
             if (condType != "boolean" && condType != "unknown") {
                 reportError(whileStmt->line, "condição do 'while' deve ser boolean, obteve " + condType);
             }
-            for (auto& s : whileStmt->body) checkStmt(s.get());
+            for (auto& s : whileStmt->body) {
+                checkStmt(s.get());
+            }
         }
         else if (auto* printStmt = dynamic_cast<const PrintStmt*>(stmt)) {
             std::string expType = inferExpType(printStmt->expression.get());
@@ -152,24 +240,35 @@ private:
             }
         }
         else if (auto* block = dynamic_cast<const BlockStmt*>(stmt)) {
-            for (auto& s : block->stmts) checkStmt(s.get());
+            for (auto& s : block->stmts) {
+                checkStmt(s.get());
+            }
         }
     }
 
     // ==================== Inferência de tipo de expressões ====================
 
     std::string inferExpType(const Exp* exp) const {
-        if (!exp) return "unknown";
+        if (!exp) {
+            return "unknown";
+        }
 
-        if (dynamic_cast<const IntLiteralExp*>(exp)) return "int";
-        if (dynamic_cast<const TrueLiteralExp*>(exp)) return "boolean";
-        if (dynamic_cast<const FalseLiteralExp*>(exp)) return "boolean";
-        if (dynamic_cast<const ThisExp*>(exp)) return currentClass_;
+        if (dynamic_cast<const IntLiteralExp*>(exp)) {
+            return "int";
+        }
+        if (dynamic_cast<const TrueLiteralExp*>(exp)) {
+            return "boolean";
+        }
+        if (dynamic_cast<const FalseLiteralExp*>(exp)) {
+            return "boolean";
+        }
+        if (dynamic_cast<const ThisExp*>(exp)) {
+            return currentClass_;
+        }
 
         if (auto* id = dynamic_cast<const IdentifierExp*>(exp)) {
             const Symbol* sym = table_.lookup(id->name, currentScope());
             if (!sym) {
-                // Não reporta erro aqui pra não duplicar (reporta no checkStmt se for assignment)
                 return "unknown";
             }
             return sym->type;
@@ -178,63 +277,89 @@ private:
         if (auto* plus = dynamic_cast<const PlusExp*>(exp)) {
             std::string lt = inferExpType(plus->left.get());
             std::string rt = inferExpType(plus->right.get());
-            if (lt != "int" && lt != "unknown") reportErrorConst(exp->line, "operador '+' requer int à esquerda, obteve " + lt);
-            if (rt != "int" && rt != "unknown") reportErrorConst(exp->line, "operador '+' requer int à direita, obteve " + rt);
+            if (lt != "int" && lt != "unknown") {
+                reportErrorConst(exp->line, "operador '+' requer int à esquerda, obteve " + lt);
+            }
+            if (rt != "int" && rt != "unknown") {
+                reportErrorConst(exp->line, "operador '+' requer int à direita, obteve " + rt);
+            }
             return "int";
         }
         if (auto* minus = dynamic_cast<const MinusExp*>(exp)) {
             std::string lt = inferExpType(minus->left.get());
             std::string rt = inferExpType(minus->right.get());
-            if (lt != "int" && lt != "unknown") reportErrorConst(exp->line, "operador '-' requer int à esquerda, obteve " + lt);
-            if (rt != "int" && rt != "unknown") reportErrorConst(exp->line, "operador '-' requer int à direita, obteve " + rt);
+            if (lt != "int" && lt != "unknown") {
+                reportErrorConst(exp->line, "operador '-' requer int à esquerda, obteve " + lt);
+            }
+            if (rt != "int" && rt != "unknown") {
+                reportErrorConst(exp->line, "operador '-' requer int à direita, obteve " + rt);
+            }
             return "int";
         }
         if (auto* times = dynamic_cast<const TimesExp*>(exp)) {
             std::string lt = inferExpType(times->left.get());
             std::string rt = inferExpType(times->right.get());
-            if (lt != "int" && lt != "unknown") reportErrorConst(exp->line, "operador '*' requer int à esquerda, obteve " + lt);
-            if (rt != "int" && rt != "unknown") reportErrorConst(exp->line, "operador '*' requer int à direita, obteve " + rt);
+            if (lt != "int" && lt != "unknown") {
+                reportErrorConst(exp->line, "operador '*' requer int à esquerda, obteve " + lt);
+            }
+            if (rt != "int" && rt != "unknown") {
+                reportErrorConst(exp->line, "operador '*' requer int à direita, obteve " + rt);
+            }
             return "int";
         }
         if (auto* lt = dynamic_cast<const LessThanExp*>(exp)) {
             std::string lType = inferExpType(lt->left.get());
             std::string rType = inferExpType(lt->right.get());
-            if (lType != "int" && lType != "unknown") reportErrorConst(exp->line, "operador '<' requer int à esquerda, obteve " + lType);
-            if (rType != "int" && rType != "unknown") reportErrorConst(exp->line, "operador '<' requer int à direita, obteve " + rType);
+            if (lType != "int" && lType != "unknown") {
+                reportErrorConst(exp->line, "operador '<' requer int à esquerda, obteve " + lType);
+            }
+            if (rType != "int" && rType != "unknown") {
+                reportErrorConst(exp->line, "operador '<' requer int à direita, obteve " + rType);
+            }
             return "boolean";
         }
         if (auto* andE = dynamic_cast<const AndExp*>(exp)) {
             std::string lType = inferExpType(andE->left.get());
             std::string rType = inferExpType(andE->right.get());
-            if (lType != "boolean" && lType != "unknown") reportErrorConst(exp->line, "operador '&&' requer boolean à esquerda, obteve " + lType);
-            if (rType != "boolean" && rType != "unknown") reportErrorConst(exp->line, "operador '&&' requer boolean à direita, obteve " + rType);
+            if (lType != "boolean" && lType != "unknown") {
+                reportErrorConst(exp->line, "operador '&&' requer boolean à esquerda, obteve " + lType);
+            }
+            if (rType != "boolean" && rType != "unknown") {
+                reportErrorConst(exp->line, "operador '&&' requer boolean à direita, obteve " + rType);
+            }
             return "boolean";
         }
         if (auto* notE = dynamic_cast<const NotExp*>(exp)) {
             std::string t = inferExpType(notE->expr.get());
-            if (t != "boolean" && t != "unknown") reportErrorConst(exp->line, "operador '!' requer boolean, obteve " + t);
+            if (t != "boolean" && t != "unknown") {
+                reportErrorConst(exp->line, "operador '!' requer boolean, obteve " + t);
+            }
             return "boolean";
         }
 
         if (auto* arrLookup = dynamic_cast<const ArrayLookupExp*>(exp)) {
             std::string arrType = inferExpType(arrLookup->array.get());
-            if (arrType != "int[]" && arrType != "unknown")
+            if (arrType != "int[]" && arrType != "unknown") {
                 reportErrorConst(exp->line, "operador '[]' requer int[], obteve " + arrType);
+            }
             std::string idxType = inferExpType(arrLookup->index.get());
-            if (idxType != "int" && idxType != "unknown")
+            if (idxType != "int" && idxType != "unknown") {
                 reportErrorConst(exp->line, "índice de array deve ser int, obteve " + idxType);
+            }
             return "int";
         }
         if (auto* arrLen = dynamic_cast<const ArrayLengthExp*>(exp)) {
             std::string arrType = inferExpType(arrLen->array.get());
-            if (arrType != "int[]" && arrType != "unknown")
+            if (arrType != "int[]" && arrType != "unknown") {
                 reportErrorConst(exp->line, ".length requer int[], obteve " + arrType);
+            }
             return "int";
         }
         if (auto* newArr = dynamic_cast<const NewArrayExp*>(exp)) {
             std::string sizeType = inferExpType(newArr->size.get());
-            if (sizeType != "int" && sizeType != "unknown")
+            if (sizeType != "int" && sizeType != "unknown") {
                 reportErrorConst(exp->line, "tamanho de new int[] deve ser int, obteve " + sizeType);
+            }
             return "int[]";
         }
         if (auto* newObj = dynamic_cast<const NewObjectExp*>(exp)) {
@@ -247,7 +372,9 @@ private:
         }
         if (auto* call = dynamic_cast<const MethodCallExp*>(exp)) {
             std::string objType = inferExpType(call->object.get());
-            if (objType == "unknown") return "unknown";
+            if (objType == "unknown") {
+                return "unknown";
+            }
             const Symbol* method = table_.lookupMethod(objType, call->method);
             if (!method) {
                 reportErrorConst(exp->line, "método '" + call->method + "' não encontrado na classe '" + objType + "'");
@@ -277,7 +404,9 @@ private:
     // Versão const de reportError para uso dentro de inferExpType
     void reportErrorConst(int line, const std::string& msg) const {
         std::cerr << "Erro semântico";
-        if (line > 0) std::cerr << " na linha " << line;
+        if (line > 0) {
+            std::cerr << " na linha " << line;
+        }
         std::cerr << ": " << msg << std::endl;
         const_cast<SemanticAnalyzer*>(this)->errorCount_++;
     }

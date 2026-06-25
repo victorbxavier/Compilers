@@ -1,0 +1,61 @@
+// Programa correto: uso extensivo de arrays
+// Cobre: new int[], indexação, .length, atribuição em array, passagem como parâmetro
+
+class Main {
+    public static void main(String[] args){
+        System.out.println(new ArrayOps().run());
+    }
+}
+
+class ArrayOps {
+    int[] data ;
+    int len ;
+
+    public int run(){
+        int sum ;
+        int ignore ;
+        ignore = this.create(5) ;
+        ignore = this.fill() ;
+        sum = this.sumAll() ;
+        System.out.println(sum) ;
+        System.out.println(data.length) ;
+        return 0 ;
+    }
+
+    public int create(int size){
+        data = new int[size] ;
+        len = size ;
+        return 0 ;
+    }
+
+    public int fill(){
+        int i ;
+        i = 0 ;
+        while (i < len) {
+            data[i] = i * i ;
+            i = i + 1 ;
+        }
+        return 0 ;
+    }
+
+    public int sumAll(){
+        int i ;
+        int total ;
+        i = 0 ;
+        total = 0 ;
+        while (i < len) {
+            total = total + data[i] ;
+            i = i + 1 ;
+        }
+        return total ;
+    }
+
+    public int getAt(int index){
+        return data[index] ;
+    }
+
+    public int setAt(int index, int val){
+        data[index] = val ;
+        return 0 ;
+    }
+}

@@ -1,0 +1,20 @@
+// Programa com erros sintáticos para a gramática da Unidade 2
+// Erro 1: if sem chaves (gramática v2 exige { })
+// Erro 2: falta de ponto-e-vírgula
+
+class SyntaxErrors {
+    public static void main(String[] args){
+        System.out.println(new Errado().test(5));
+    }
+}
+
+class Errado {
+    int x ;
+
+    public int test(int n){
+        x = 10 ;
+        if (x < n)
+            x = 5 ;
+        return x ;
+    }
+}

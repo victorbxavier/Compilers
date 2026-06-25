@@ -31,10 +31,10 @@ make all
 
 O binário será gerado em `build/compiler`.
 
-Para limpar os artefatos:
+Para limpar os artefatos e recompilar:
 
 ```bash
-make clean
+make clean && make all
 ```
 
 ### Compilação manual (sem Make)
@@ -65,17 +65,26 @@ g++ lex.yy.cc -o lexer -lfl
 
 ```bash
 # Análise completa (léxica + sintática + semântica)
-./build/compiler assets/prog-factorial-v2.ling
-./build/compiler assets/prog-bubblesort-v2.ling
+./build/compiler assets/unidade-2/prog-factorial-v2.ling
+./build/compiler assets/unidade-2/prog-bubblesort-v2.ling
 
 # Exibir a AST e tabela de símbolos
-./build/compiler --ast --symbols assets/prog-factorial-v2.ling
+./build/compiler --ast --symbols assets/unidade-2/prog-factorial-v2.ling
 
 # Exibir apenas a lista de tokens
-./build/compiler --tokens assets/prog-factorial-v2.ling
+./build/compiler --tokens assets/unidade-2/prog-factorial-v2.ling
 
 # Testar programa com erros semânticos
-./build/compiler assets/prog-semantic-error-v2.ling
+./build/compiler assets/unidade-2/prog-semantic-error-v2.ling
+
+# Testar erro sintático (if sem chaves)
+./build/compiler assets/unidade-2/prog-erro-sintatico-v2.ling
+
+# Erros léxicos com sugestões de correção
+./build/compiler --suggest assets/unidade-2/prog-erro-lexico.ling
+
+# Parar no primeiro erro léxico
+./build/compiler --stop-first-error assets/unidade-2/prog-erro-lexico.ling
 ```
 
 ### Saída esperada
@@ -123,7 +132,17 @@ src/
 ├── symbol_table.h        # Tabela de símbolos (com busca hierárquica e herança)
 ├── semantic_analyzer.h   # Analisador semântico (percorre AST + consulta tabela)
 └── main.cpp              # Programa principal (orquestra o pipeline)
-assets/                   # Programas de teste (.ling)
+assets/
+├── unidade-1/            # Programas de teste da 1ª unidade (gramática antiga)
+│   ├── prog-factorial.ling
+│   ├── prog-bubblesort.ling
+│   └── ...
+└── unidade-2/            # Programas de teste da 2ª unidade (gramática nova)
+    ├── prog-factorial-v2.ling        # Correto — recursão, if/else com {}
+    ├── prog-bubblesort-v2.ling       # Correto — arrays, herança, while
+    ├── prog-semantic-error-v2.ling   # 4 erros semânticos
+    ├── prog-erro-sintatico-v2.ling   # Erro sintático (if sem chaves)
+    └── prog-erro-lexico.ling         # Erros léxicos (tokens inválidos)
 docs/                     # Gramática, checklists e documentação
 relatorio/                # Relatório técnico (LaTeX)
 Makefile                  # Automação de build

@@ -21,7 +21,9 @@
 
 class Parser {
 public:
-    Parser(const std::vector<Token>& tokens) : tokens_(tokens), pos_(0), hadError_(false) {}
+    Parser(const std::vector<Token>& tokens, bool stopOnFirstError = false)
+        : tokens_(tokens), pos_(0), hadError_(false), errorCount_(0),
+          stopOnFirstError_(stopOnFirstError) {}
 
     /**
      * @brief Executa o parsing e retorna a AST (ou nullptr se falhou).
@@ -34,12 +36,15 @@ public:
     }
 
     bool hadError() const { return hadError_; }
+    int getErrorCount() const { return errorCount_; }
     const SymbolTable& getSymbolTable() const { return symbolTable_; }
 
 private:
     std::vector<Token> tokens_;
     int pos_;
     bool hadError_;
+    int errorCount_;
+    bool stopOnFirstError_;
     SymbolTable symbolTable_;
     std::string currentClass_;
     std::string currentMethod_;
@@ -83,8 +88,9 @@ private:
     }
 
     void error(TokenType expected) {
-        if (hadError_) return;
+        if (hadError_ && stopOnFirstError_) return;
         hadError_ = true;
+        errorCount_++;
         Token tok = currentToken();
         std::cerr << "Erro sintático na linha " << tok.line << ":" << tok.column
                   << ": esperado " << tokenTypeToString(expected)
@@ -95,8 +101,9 @@ private:
     }
 
     void error(const std::string& msg) {
-        if (hadError_) return;
+        if (hadError_ && stopOnFirstError_) return;
         hadError_ = true;
+        errorCount_++;
         Token tok = currentToken();
         std::cerr << "Erro sintático na linha " << tok.line << ":" << tok.column
                   << ": " << msg;
@@ -190,13 +197,15 @@ private:
             std::string className = matchAndGet(TokenType::ID); if (hadError_) break;
             int classLine = tokens_[pos_ - 1].line;
             currentClass_ = className;
-            symbolTable_.addSymbol(className, "class", "global", classLine, SymbolCategory::CLASS);
 
             std::string parent = "";
             if (currentType() == TokenType::EXTENDS) {
                 match(TokenType::EXTENDS); if (hadError_) break;
                 parent = matchAndGet(TokenType::ID); if (hadError_) break;
             }
+
+            symbolTable_.addSymbol(className, "class", "global", classLine, SymbolCategory::CLASS, parent);
+
             match(TokenType::LBRACE); if (hadError_) break;
             auto vars = parseDefV(SymbolCategory::INSTANCE_VAR);
             if (hadError_) break;

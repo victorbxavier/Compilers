@@ -41,7 +41,10 @@ void printUsage(const char* progName) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc < 2) { printUsage(argv[0]); return 1; }
+    if (argc < 2) {
+        printUsage(argv[0]);
+        return 1;
+    }
 
     bool flagTokens = false;
     bool flagAst = false;
@@ -51,13 +54,22 @@ int main(int argc, char* argv[]) {
     const char* filename = nullptr;
 
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--tokens") == 0) flagTokens = true;
-        else if (strcmp(argv[i], "--ast") == 0) flagAst = true;
-        else if (strcmp(argv[i], "--symbols") == 0) flagSymbols = true;
-        else if (strcmp(argv[i], "--suggest") == 0) flagSuggest = true;
-        else if (strcmp(argv[i], "--stop-first-error") == 0) flagStopFirst = true;
-        else if (strcmp(argv[i], "--help") == 0) { printUsage(argv[0]); return 0; }
-        else filename = argv[i];
+        if (strcmp(argv[i], "--tokens") == 0) {
+            flagTokens = true;
+        } else if (strcmp(argv[i], "--ast") == 0) {
+            flagAst = true;
+        } else if (strcmp(argv[i], "--symbols") == 0) {
+            flagSymbols = true;
+        } else if (strcmp(argv[i], "--suggest") == 0) {
+            flagSuggest = true;
+        } else if (strcmp(argv[i], "--stop-first-error") == 0) {
+            flagStopFirst = true;
+        } else if (strcmp(argv[i], "--help") == 0) {
+            printUsage(argv[0]);
+            return 0;
+        } else {
+            filename = argv[i];
+        }
     }
 
     if (!filename) {
@@ -96,16 +108,19 @@ int main(int argc, char* argv[]) {
 
     if (flagTokens) {
         std::cout << "=== Lista de Tokens (" << tokenList.size() << " tokens) ===" << std::endl;
-        for (const auto& tok : tokenList) printToken(tok);
+        for (const auto& tok : tokenList) {
+            printToken(tok);
+        }
         return 0;
     }
 
     // === ETAPA 2: Análise Sintática (constrói AST + preenche tabela) ===
-    Parser parser(tokenList);
+    Parser parser(tokenList, flagStopFirst);
     auto ast = parser.parse();
 
     if (!ast || parser.hadError()) {
-        std::cerr << "=== Análise sintática falhou ===" << std::endl;
+        std::cerr << "\n=== Análise sintática falhou (" << parser.getErrorCount()
+                  << " erro(s)) ===" << std::endl;
         return 1;
     }
 

@@ -68,18 +68,22 @@ public:
         // 1. Busca no escopo exato (parâmetro/variável local)
         for (auto& sym : symbols_) {
             if (sym.name == name && sym.scope == scope &&
-                (sym.category == SymbolCategory::LOCAL_VAR || sym.category == SymbolCategory::PARAMETER))
+                (sym.category == SymbolCategory::LOCAL_VAR || sym.category == SymbolCategory::PARAMETER)) {
                 return &sym;
+            }
         }
         // 2. Busca como atributo da classe (escopo = nome da classe)
         std::string classScope = scope;
         auto dotPos = classScope.find('.');
-        if (dotPos != std::string::npos) classScope = classScope.substr(0, dotPos);
+        if (dotPos != std::string::npos) {
+            classScope = classScope.substr(0, dotPos);
+        }
 
         for (auto& sym : symbols_) {
             if (sym.name == name && sym.scope == classScope &&
-                sym.category == SymbolCategory::INSTANCE_VAR)
+                sym.category == SymbolCategory::INSTANCE_VAR) {
                 return &sym;
+            }
         }
         // 3. Busca em classe pai (herança)
         const Symbol* classSym = lookupClass(classScope);
@@ -92,8 +96,9 @@ public:
     /** Busca uma classe por nome. */
     const Symbol* lookupClass(const std::string& name) const {
         for (auto& sym : symbols_) {
-            if (sym.name == name && sym.category == SymbolCategory::CLASS)
+            if (sym.name == name && sym.category == SymbolCategory::CLASS) {
                 return &sym;
+            }
         }
         return nullptr;
     }
@@ -102,8 +107,9 @@ public:
     const Symbol* lookupMethod(const std::string& className, const std::string& methodName) const {
         for (auto& sym : symbols_) {
             if (sym.name == methodName && sym.scope == className &&
-                sym.category == SymbolCategory::METHOD)
+                sym.category == SymbolCategory::METHOD) {
                 return &sym;
+            }
         }
         // Busca na classe pai
         const Symbol* cls = lookupClass(className);
@@ -116,19 +122,28 @@ public:
     /** Verifica se um símbolo já existe no mesmo escopo (duplicata). */
     bool isDuplicate(const std::string& name, const std::string& scope, SymbolCategory cat) const {
         for (auto& sym : symbols_) {
-            if (sym.name == name && sym.scope == scope && sym.category == cat)
+            if (sym.name == name && sym.scope == scope && sym.category == cat) {
                 return true;
+            }
         }
         return false;
     }
 
-    /** Retorna todos os parâmetros de um método. */
+    /** Retorna todos os parâmetros de um método (com suporte a herança). */
     std::vector<const Symbol*> getMethodParams(const std::string& className, const std::string& methodName) const {
         std::vector<const Symbol*> params;
         std::string scope = className + "." + methodName;
         for (auto& sym : symbols_) {
-            if (sym.scope == scope && sym.category == SymbolCategory::PARAMETER)
+            if (sym.scope == scope && sym.category == SymbolCategory::PARAMETER) {
                 params.push_back(&sym);
+            }
+        }
+        // Se não encontrou parâmetros, busca na classe pai
+        if (params.empty()) {
+            const Symbol* cls = lookupClass(className);
+            if (cls && !cls->parent.empty()) {
+                return getMethodParams(cls->parent, methodName);
+            }
         }
         return params;
     }
@@ -166,8 +181,9 @@ private:
     const Symbol* lookupInherited(const std::string& name, const std::string& className) const {
         for (auto& sym : symbols_) {
             if (sym.name == name && sym.scope == className &&
-                sym.category == SymbolCategory::INSTANCE_VAR)
+                sym.category == SymbolCategory::INSTANCE_VAR) {
                 return &sym;
+            }
         }
         const Symbol* cls = lookupClass(className);
         if (cls && !cls->parent.empty()) {

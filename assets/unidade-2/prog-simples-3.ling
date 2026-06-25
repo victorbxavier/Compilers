@@ -1,0 +1,34 @@
+// Programa simples: contador com duas classes
+class Main {
+    public static void main(String[] args){
+        System.out.println(new Contador().usar());
+    }
+}
+
+class Contador {
+    int valor ;
+
+    public int reset(){
+        valor = 0 ;
+        return 0 ;
+    }
+
+    public int incrementar(){
+        valor = valor + 1 ;
+        return valor ;
+    }
+
+    public int getValor(){
+        return valor ;
+    }
+
+    public int usar(){
+        int ignore ;
+        ignore = this.reset() ;
+        ignore = this.incrementar() ;
+        ignore = this.incrementar() ;
+        ignore = this.incrementar() ;
+        System.out.println(this.getValor()) ;
+        return this.getValor() ;
+    }
+}

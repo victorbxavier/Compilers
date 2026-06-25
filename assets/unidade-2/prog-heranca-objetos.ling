@@ -1,0 +1,99 @@
+// Programa que demonstra: herança, criação de objetos, override,
+// chamada de método, operadores boolean, .length
+
+class Main {
+    public static void main(String[] args){
+        System.out.println(new Dog().speak());
+    }
+}
+
+class Animal {
+    int age ;
+    boolean alive ;
+
+    public int init(int a){
+        age = a ;
+        alive = true ;
+        return 0 ;
+    }
+
+    public int speak(){
+        return 0 ;
+    }
+
+    public int getAge(){
+        return age ;
+    }
+
+    public boolean isAlive(){
+        return alive ;
+    }
+}
+
+class Dog extends Animal {
+    int[] tricks ;
+    int numTricks ;
+
+    public int speak(){
+        return 1 ;
+    }
+
+    public int learnTricks(int count){
+        int i ;
+        int setupResult ;
+        tricks = new int[count] ;
+        numTricks = count ;
+        i = 0 ;
+        while (i < count) {
+            tricks[i] = i * 10 ;
+            i = i + 1 ;
+        }
+        setupResult = this.init(3) ;
+        return tricks.length ;
+    }
+
+    public int showOff(){
+        int total ;
+        int i ;
+        boolean canShow ;
+        total = 0 ;
+        i = 0 ;
+        canShow = this.isAlive() && (0 < numTricks) ;
+        if (canShow) {
+            while (i < numTricks) {
+                total = total + tricks[i] ;
+                i = i + 1 ;
+            }
+        } else {
+            total = 0 - 1 ;
+        }
+        return total ;
+    }
+
+    public boolean isGoodBoy(){
+        boolean result ;
+        result = this.isAlive() && !(numTricks < 1) ;
+        return result ;
+    }
+}
+
+class Kennel {
+    public int run(){
+        Dog rex ;
+        int tricks ;
+        int sound ;
+        boolean good ;
+        int show ;
+
+        rex = new Dog() ;
+        tricks = rex.learnTricks(5) ;
+        sound = rex.speak() ;
+        good = rex.isGoodBoy() ;
+        show = rex.showOff() ;
+
+        System.out.println(tricks) ;
+        System.out.println(sound) ;
+        System.out.println(show) ;
+        return 0 ;
+    }
+}

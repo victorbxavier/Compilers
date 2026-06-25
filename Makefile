@@ -35,11 +35,11 @@ $(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $(TARGET) $(OBJS)
 
 test: $(TARGET)
-	@echo "=== Teste: prog-factorial.ling ==="
-	./$(TARGET) --ast --symbols assets/prog-factorial.ling
+	@echo "=== Teste: prog-factorial-v2.ling ==="
+	./$(TARGET) --ast --symbols assets/unidade-2/prog-factorial-v2.ling
 	@echo ""
-	@echo "=== Teste: prog-bubblesort.ling ==="
-	./$(TARGET) --ast --symbols assets/prog-bubblesort.ling
+	@echo "=== Teste: prog-bubblesort-v2.ling ==="
+	./$(TARGET) --ast --symbols assets/unidade-2/prog-bubblesort-v2.ling
 
 clean:
 	rm -rf $(BUILD_DIR)

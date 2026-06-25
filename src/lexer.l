@@ -32,7 +32,7 @@ int columnNumber = 1;
 bool stopOnFirstError = false;
 
 // Flag para controlar se sugestões de correção devem ser exibidas.
-bool showSuggestions = true;
+bool showSuggestions = false;
 
 // Lista de palavras-chave (usada para sugestões de correção).
 static const char* keywords[] = {
@@ -98,7 +98,7 @@ void reportLexError(const char* text, int line, int col) {
 
     std::cerr << "Erro léxico na linha " << line << ":" << col
               << ": token inválido \"" << text << "\"" << std::endl;
-    if (showSuggestions && bestDist <= 2) {
+    if (showSuggestions && bestDist <= 3) {
         std::cerr << "  Sugestão: você quis dizer \"" << bestMatch << "\"?" << std::endl;
     }
     lexerHadError = true;

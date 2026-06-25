@@ -1,0 +1,172 @@
+// Simulação de um jogo simples: personagem se move em um grid
+// Cobre: herança, polimorfismo, boolean, arrays, múltiplos objetos
+
+class Main {
+    public static void main(String[] args){
+        System.out.println(new Game().play());
+    }
+}
+
+class Entity {
+    int posX ;
+    int posY ;
+    int health ;
+    boolean alive ;
+
+    public int spawn(int x, int y, int hp){
+        posX = x ;
+        posY = y ;
+        health = hp ;
+        alive = true ;
+        return 0 ;
+    }
+
+    public int moveRight(){
+        posX = posX + 1 ;
+        return posX ;
+    }
+
+    public int moveUp(){
+        posY = posY + 1 ;
+        return posY ;
+    }
+
+    public int takeDamage(int dmg){
+        health = health - dmg ;
+        if (health < 1) {
+            alive = false ;
+        }
+        return health ;
+    }
+
+    public boolean isAlive(){
+        return alive ;
+    }
+
+    public int getX(){
+        return posX ;
+    }
+
+    public int getY(){
+        return posY ;
+    }
+
+    public int getHealth(){
+        return health ;
+    }
+}
+
+class Player extends Entity {
+    int score ;
+    int[] inventory ;
+    int invSize ;
+
+    public int setup(int startX, int startY){
+        int ignore ;
+        ignore = this.spawn(startX, startY, 100) ;
+        score = 0 ;
+        inventory = new int[10] ;
+        invSize = 0 ;
+        return 0 ;
+    }
+
+    public int collectItem(int itemId){
+        if (invSize < inventory.length) {
+            inventory[invSize] = itemId ;
+            invSize = invSize + 1 ;
+            score = score + 10 ;
+        }
+        return score ;
+    }
+
+    public int attack(Entity enemy){
+        int ignore ;
+        ignore = enemy.takeDamage(25) ;
+        score = score + 5 ;
+        return score ;
+    }
+
+    public int getScore(){
+        return score ;
+    }
+}
+
+class Monster extends Entity {
+    int power ;
+
+    public int spawn(int x, int y, int hp){
+        int ignore ;
+        ignore = this.spawnBase(x, y, hp) ;
+        power = 10 ;
+        return 0 ;
+    }
+
+    public int spawnBase(int x, int y, int hp){
+        posX = x ;
+        posY = y ;
+        health = hp ;
+        alive = true ;
+        return 0 ;
+    }
+
+    public int getPower(){
+        return power ;
+    }
+
+    public int attackPlayer(Player p){
+        int ignore ;
+        ignore = p.takeDamage(power) ;
+        return power ;
+    }
+}
+
+class Game {
+    public int play(){
+        Player hero ;
+        Monster goblin ;
+        Monster dragon ;
+        int ignore ;
+        int round ;
+        boolean gameOn ;
+
+        hero = new Player() ;
+        goblin = new Monster() ;
+        dragon = new Monster() ;
+
+        ignore = hero.setup(0, 0) ;
+        ignore = goblin.spawn(3, 3, 30) ;
+        ignore = dragon.spawn(7, 7, 80) ;
+
+        round = 0 ;
+        gameOn = true ;
+
+        while (gameOn) {
+            ignore = hero.moveRight() ;
+            ignore = hero.moveUp() ;
+            ignore = hero.collectItem(round + 1) ;
+
+            if (round < 3) {
+                ignore = hero.attack(goblin) ;
+            } else {
+                ignore = dragon.attackPlayer(hero) ;
+            }
+
+            round = round + 1 ;
+
+            if (!(hero.isAlive())) {
+                gameOn = false ;
+            }
+
+            if (5 < round) {
+                gameOn = false ;
+            }
+        }
+
+        System.out.println(hero.getScore()) ;
+        System.out.println(hero.getHealth()) ;
+        System.out.println(hero.getX()) ;
+        System.out.println(hero.getY()) ;
+
+        return hero.getScore() ;
+    }
+}
