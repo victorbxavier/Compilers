@@ -57,7 +57,7 @@ UNIDADE 2:  .ling → Lexer → Tokens → Parser (constrói AST) → Análise S
 - Threshold de sugestão aumentado para distância ≤ 3
 - Opção `%option noinput` para eliminar warnings
 
-**Comportamento padrão:** lista todos os erros léxicos encontrados. Com `--stop-first-error`, para no primeiro. Com `--suggest`, mostra "você quis dizer X?" para tokens inválidos próximos de keywords.
+**Comportamento padrão:** lista todos os erros léxicos encontrados. Com `--stop-first-error`, para no primeiro. Com `--suggest`, mostra "você quis dizer X?" para tokens inválidos próximos de keywords e sugestões estruturais para erros sintáticos.
 
 ---
 
@@ -203,7 +203,7 @@ parseExp() → parseAndexp() → parseRelexp() → parseAddexp() → parseMulexp
 - `--tokens` — mostra lista de tokens e para
 - `--ast` — mostra a árvore sintática
 - `--symbols` — mostra a tabela de símbolos
-- `--suggest` — ativa sugestões de correção léxica
+- `--suggest` — ativa sugestões de correção léxica e sintática
 - `--stop-first-error` — para no primeiro erro
 
 ---

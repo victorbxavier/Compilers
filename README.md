@@ -57,7 +57,7 @@ g++ lex.yy.cc -o lexer -lfl
 | `--tokens`           | Exibe a lista de tokens (para após análise léxica) |
 | `--ast`              | Exibe a árvore sintática abstrata                  |
 | `--symbols`          | Exibe a tabela de símbolos                         |
-| `--suggest`          | Ativa sugestões de correção léxica                 |
+| `--suggest`          | Ativa sugestões de correção léxica e sintática     |
 | `--stop-first-error` | Para no primeiro erro léxico                       |
 | `--help`             | Exibe mensagem de ajuda                            |
 
@@ -83,6 +83,9 @@ g++ lex.yy.cc -o lexer -lfl
 # Erros léxicos com sugestões de correção
 ./build/compiler --suggest assets/unidade-2/prog-erro-lexico.ling
 
+# Erros sintáticos com sugestões de correção
+./build/compiler --suggest assets/unidade-2/prog-erro-sintatico.ling
+
 # Parar no primeiro erro léxico
 ./build/compiler --stop-first-error assets/unidade-2/prog-erro-lexico.ling
 ```
@@ -91,7 +94,7 @@ g++ lex.yy.cc -o lexer -lfl
 
 - **Sucesso:** `=== Análise semântica concluída sem erros ===`
 - **Erro léxico:** mensagem com linha:coluna e sugestão de correção
-- **Erro sintático:** mensagem com linha:coluna, token esperado e token encontrado
+- **Erro sintático:** mensagem com linha:coluna, token esperado, token encontrado e sugestão com `--suggest`
 - **Erro semântico:** mensagem com linha, tipo do erro e contexto
 
 ## Pipeline de Compilação

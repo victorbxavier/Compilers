@@ -21,9 +21,11 @@
 
 class Parser {
 public:
-    Parser(const std::vector<Token>& tokens, bool stopOnFirstError = false)
+    Parser(const std::vector<Token>& tokens, bool stopOnFirstError = false,
+           bool showSuggestions = false)
         : tokens_(tokens), pos_(0), hadError_(false), errorCount_(0),
-          stopOnFirstError_(stopOnFirstError) {}
+          stopOnFirstError_(stopOnFirstError),
+          showSuggestions_(showSuggestions) {}
 
     /**
      * @brief Executa o parsing e retorna a AST (ou nullptr se falhou).
@@ -45,6 +47,7 @@ private:
     bool hadError_;
     int errorCount_;
     bool stopOnFirstError_;
+    bool showSuggestions_;
     SymbolTable symbolTable_;
     std::string currentClass_;
     std::string currentMethod_;
@@ -87,6 +90,95 @@ private:
         return currentClass_ + "." + currentMethod_;
     }
 
+    bool hasNextToken() const {
+        return pos_ + 1 < (int)tokens_.size();
+    }
+
+    std::string tokenLexeme(TokenType type) const {
+        switch (type) {
+            case TokenType::CLASS: return "class";
+            case TokenType::PUBLIC: return "public";
+            case TokenType::STATIC: return "static";
+            case TokenType::VOID: return "void";
+            case TokenType::MAIN: return "main";
+            case TokenType::STRING: return "String";
+            case TokenType::RETURN: return "return";
+            case TokenType::INT: return "int";
+            case TokenType::BOOLEAN: return "boolean";
+            case TokenType::IF: return "if";
+            case TokenType::ELSE: return "else";
+            case TokenType::WHILE: return "while";
+            case TokenType::SYSTEM: return "System";
+            case TokenType::OUT: return "out";
+            case TokenType::PRINTLN: return "println";
+            case TokenType::TRUE: return "true";
+            case TokenType::FALSE: return "false";
+            case TokenType::THIS: return "this";
+            case TokenType::NEW: return "new";
+            case TokenType::EXTENDS: return "extends";
+            case TokenType::LENGTH: return "length";
+            case TokenType::AND: return "&&";
+            case TokenType::LT: return "<";
+            case TokenType::GT: return ">";
+            case TokenType::PLUS: return "+";
+            case TokenType::MINUS: return "-";
+            case TokenType::MULT: return "*";
+            case TokenType::ASSIGN: return "=";
+            case TokenType::NOT: return "!";
+            case TokenType::LPAREN: return "(";
+            case TokenType::RPAREN: return ")";
+            case TokenType::LBRACKET: return "[";
+            case TokenType::RBRACKET: return "]";
+            case TokenType::LBRACE: return "{";
+            case TokenType::RBRACE: return "}";
+            case TokenType::SEMICOLON: return ";";
+            case TokenType::COMMA: return ",";
+            case TokenType::DOT: return ".";
+            case TokenType::ID: return "identificador";
+            case TokenType::NUMBER: return "número";
+            case TokenType::END_OF_FILE: return "fim do arquivo";
+            case TokenType::UNKNOWN: return "token válido";
+        }
+        return tokenTypeToString(type);
+    }
+
+    std::string foundTokenText(const Token& tok) const {
+        if (!tok.lexeme.empty() && tok.type != TokenType::END_OF_FILE)
+            return "\"" + tok.lexeme + "\"";
+        return tokenLexeme(tok.type);
+    }
+
+    void suggestSyntaxFix(TokenType expected, const Token& found) const {
+        if (!showSuggestions_) return;
+
+        if (hasNextToken() && tokens_[pos_ + 1].type == expected) {
+            std::cerr << "  Sugestão: remova o token inesperado "
+                      << foundTokenText(found) << "." << std::endl;
+            return;
+        }
+
+        std::cerr << "  Sugestão: insira '" << tokenLexeme(expected)
+                  << "' antes de " << foundTokenText(found) << ".";
+
+        if (expected == TokenType::LBRACE) {
+            std::cerr << " Blocos de if/while devem usar chaves.";
+        } else if (expected == TokenType::SEMICOLON) {
+            std::cerr << " Declarações e comandos de atribuição terminam com ponto-e-vírgula.";
+        } else if (expected == TokenType::RPAREN) {
+            std::cerr << " Verifique se a lista de argumentos ou condição foi fechada.";
+        } else if (expected == TokenType::RBRACE) {
+            std::cerr << " Verifique se o bloco anterior foi fechado.";
+        }
+
+        std::cerr << std::endl;
+    }
+
+    void printSuggestion(const std::string& suggestion) const {
+        if (showSuggestions_ && !suggestion.empty()) {
+            std::cerr << "  Sugestão: " << suggestion << std::endl;
+        }
+    }
+
     void error(TokenType expected) {
         if (hadError_ && stopOnFirstError_) return;
         hadError_ = true;
@@ -98,9 +190,10 @@ private:
         if (tok.type == TokenType::ID || tok.type == TokenType::NUMBER)
             std::cerr << " (\"" << tok.lexeme << "\")";
         std::cerr << std::endl;
+        suggestSyntaxFix(expected, tok);
     }
 
-    void error(const std::string& msg) {
+    void error(const std::string& msg, const std::string& suggestion = "") {
         if (hadError_ && stopOnFirstError_) return;
         hadError_ = true;
         errorCount_++;
@@ -111,6 +204,7 @@ private:
         if (tok.type == TokenType::ID || tok.type == TokenType::NUMBER)
             std::cerr << " \"" << tok.lexeme << "\"";
         std::cerr << ")" << std::endl;
+        printSuggestion(suggestion);
     }
 
     // ==================== Parsing de tipos ====================
@@ -134,7 +228,8 @@ private:
             std::string name = matchAndGet(TokenType::ID);
             return std::make_unique<IdentifierType>(name);
         }
-        error("esperado um tipo (int, boolean, int[] ou identificador)");
+        error("esperado um tipo (int, boolean, int[] ou identificador)",
+              "use 'int', 'boolean', 'int[]' ou o nome de uma classe como tipo");
         return nullptr;
     }
 
@@ -402,7 +497,8 @@ private:
             return std::make_unique<PrintStmt>(std::move(exp));
         }
         else {
-            error("esperado um comando (identificador, 'if', 'while' ou 'System')");
+            error("esperado um comando (identificador, 'if', 'while' ou 'System')",
+                  "inicie o comando com uma atribuição, if, while ou System.out.println(...)");
             return nullptr;
         }
     }
@@ -428,7 +524,8 @@ private:
             stmt->line = ln;
             return stmt;
         }
-        error("esperado '=' ou '[' após identificador em comando");
+        error("esperado '=' ou '[' após identificador em comando",
+              "use 'nome = expressão;' ou 'nome[índice] = expressão;'");
         return nullptr;
     }
 
@@ -534,7 +631,8 @@ private:
                     match(TokenType::RPAREN); if (hadError_) return nullptr;
                     expr = std::make_unique<MethodCallExp>(std::move(expr), method, std::move(args));
                 } else {
-                    error("esperado 'length' ou identificador de método após '.'");
+                    error("esperado 'length' ou identificador de método após '.'",
+                          "após '.', use '.length' ou '.metodo(argumentos)'");
                     return nullptr;
                 }
             }
@@ -590,10 +688,12 @@ private:
                 match(TokenType::RPAREN); if (hadError_) return nullptr;
                 return std::make_unique<NewObjectExp>(className);
             }
-            error("esperado identificador ou 'int' após 'new'");
+            error("esperado identificador ou 'int' após 'new'",
+                  "use 'new int[expressão]' para arrays ou 'new Classe()' para objetos");
             return nullptr;
         }
-        error("esperado expressão primária");
+        error("esperado expressão primária",
+              "use um identificador, número, true, false, this, new, !expressão ou uma expressão entre parênteses");
         return nullptr;
     }
 

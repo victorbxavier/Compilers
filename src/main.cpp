@@ -8,7 +8,7 @@
  *   --tokens           Exibe lista de tokens (para após lexer)
  *   --ast              Exibe a árvore sintática abstrata
  *   --symbols          Exibe a tabela de símbolos
- *   --suggest          Ativa sugestões de correção léxica
+ *   --suggest          Ativa sugestões de correção léxica e sintática
  *   --stop-first-error Para no primeiro erro léxico
  *   --help             Exibe ajuda
  */
@@ -115,7 +115,7 @@ int main(int argc, char* argv[]) {
     }
 
     // === ETAPA 2: Análise Sintática (constrói AST + preenche tabela) ===
-    Parser parser(tokenList, flagStopFirst);
+    Parser parser(tokenList, flagStopFirst, flagSuggest);
     auto ast = parser.parse();
 
     if (!ast || parser.hadError()) {
