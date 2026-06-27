@@ -1,0 +1,95 @@
+// Programa correto: lista encadeada com múltiplas classes e métodos
+// Cobre: criação de objetos, chamada de método entre objetos, while, if/else
+
+class Main {
+    public static void main(String[] args){
+        System.out.println(new List().run());
+    }
+}
+
+class Node {
+    int value ;
+    Node next ;
+    boolean hasNext ;
+
+    public int init(int v){
+        value = v ;
+        hasNext = false ;
+        return 0 ;
+    }
+
+    public int getValue(){
+        return value ;
+    }
+
+    public Node getNext(){
+        return next ;
+    }
+
+    public boolean getHasNext(){
+        return hasNext ;
+    }
+
+    public int setNext(Node n){
+        next = n ;
+        hasNext = true ;
+        return 0 ;
+    }
+}
+
+class List {
+    Node head ;
+    boolean empty ;
+    int size ;
+
+    public int init(){
+        empty = true ;
+        size = 0 ;
+        return 0 ;
+    }
+
+    public int add(int val){
+        Node newNode ;
+        Node current ;
+        int ignore ;
+
+        newNode = new Node() ;
+        ignore = newNode.init(val) ;
+
+        if (empty) {
+            head = newNode ;
+            empty = false ;
+        } else {
+            current = head ;
+            while (current.getHasNext()) {
+                current = current.getNext() ;
+            }
+            ignore = current.setNext(newNode) ;
+        }
+        size = size + 1 ;
+        return size ;
+    }
+
+    public int printAll(){
+        Node current ;
+        if (!(empty)) {
+            current = head ;
+            System.out.println(current.getValue()) ;
+            while (current.getHasNext()) {
+                current = current.getNext() ;
+                System.out.println(current.getValue()) ;
+            }
+        }
+        return 0 ;
+    }
+
+    public int run(){
+        int ignore ;
+        ignore = this.init() ;
+        ignore = this.add(10) ;
+        ignore = this.add(20) ;
+        ignore = this.add(30) ;
+        ignore = this.printAll() ;
+        return size ;
+    }
+}

@@ -1,0 +1,20 @@
+// Programa simples: potência (base^exp) com loop
+class Main {
+    public static void main(String[] args){
+        System.out.println(new Potencia().calcular(2, 8));
+    }
+}
+
+class Potencia {
+    public int calcular(int base, int exp){
+        int resultado ;
+        int i ;
+        resultado = 1 ;
+        i = 0 ;
+        while (i < exp) {
+            resultado = resultado * base ;
+            i = i + 1 ;
+        }
+        return resultado ;
+    }
+}

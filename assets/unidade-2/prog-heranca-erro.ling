@@ -1,0 +1,49 @@
+// Programa com erros de herança:
+// 1. Override com tipo de retorno incompatível
+// 2. Chamada de método que não existe na classe pai
+// 3. Classe pai inexistente
+
+class Main {
+    public static void main(String[] args){
+        System.out.println(new Cat().makeSound());
+    }
+}
+
+class Animal {
+    int legs ;
+
+    public int init(int n){
+        legs = n ;
+        return 0 ;
+    }
+
+    public int makeSound(){
+        return 0 ;
+    }
+
+    public int getLegs(){
+        return legs ;
+    }
+}
+
+class Cat extends Animal {
+    boolean indoor ;
+
+    public boolean makeSound(){
+        return true ;
+    }
+
+    public int purr(){
+        int x ;
+        x = this.fly() ;
+        return x ;
+    }
+}
+
+class Ghost extends Phantom {
+    int spook ;
+
+    public int haunt(){
+        return spook ;
+    }
+}

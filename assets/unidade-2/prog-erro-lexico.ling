@@ -1,0 +1,11 @@
+class Test {
+    public static void main(String[] args){
+        System.out.println(42);
+    }
+}
+
+class Foo {
+    int 3whle ;
+    int 2cls ;
+    int @valor ;
+}

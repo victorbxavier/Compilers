@@ -1,0 +1,40 @@
+// Programa com erros variados de tipos e escopo:
+// 1. Operador + com boolean
+// 2. Operador && com int
+// 3. Variável não declarada
+// 4. Índice de array com boolean
+// 5. .length em variável que não é array
+// 6. println com boolean
+
+class Main {
+    public static void main(String[] args){
+        System.out.println(new Buggy().test());
+    }
+}
+
+class Buggy {
+    int x ;
+    boolean flag ;
+    int[] arr ;
+
+    public int test(){
+        int result ;
+
+        result = flag + 1 ;
+
+        if (x && flag) {
+            result = 0 ;
+        }
+
+        y = 42 ;
+
+        arr = new int[5] ;
+        arr[flag] = 10 ;
+
+        result = x.length ;
+
+        System.out.println(flag) ;
+
+        return result ;
+    }
+}

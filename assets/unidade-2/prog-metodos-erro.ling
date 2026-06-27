@@ -1,0 +1,45 @@
+// Programa com erros de chamada de método:
+// 1. Chamada com número errado de argumentos
+// 2. Chamada com tipos errados de argumentos
+// 3. Chamada de método inexistente
+// 4. new de classe inexistente
+
+class Main {
+    public static void main(String[] args){
+        System.out.println(new Caller().run());
+    }
+}
+
+class Calculator {
+    public int add(int a, int b){
+        return a + b ;
+    }
+
+    public int square(int n){
+        return n * n ;
+    }
+
+    public boolean isPositive(int n){
+        return 0 < n ;
+    }
+}
+
+class Caller {
+    public int run(){
+        Calculator calc ;
+        int result ;
+        Phantom ghost ;
+
+        calc = new Calculator() ;
+
+        result = calc.add(1, 2, 3) ;
+
+        result = calc.add(true, 5) ;
+
+        result = calc.multiply(4, 5) ;
+
+        ghost = new Phantom() ;
+
+        return result ;
+    }
+}

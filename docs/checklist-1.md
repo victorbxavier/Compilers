@@ -75,7 +75,7 @@
 - [ ] **6.4** Entender a tabela de símbolos (quando e onde cada símbolo é inserido)
 - [ ] **6.5** Melhorar código: adicionar mais comentários explicativos onde necessário
 - [ ] **6.6** Melhorar código: refatorar trechos repetitivos (ex: lookahead em parseDefVar)
-- [ ] **6.7** Melhorar mensagens de erro (mais contexto, sugestões de correção sintática)
+- [x] **6.7** Melhorar mensagens de erro (mais contexto, sugestões de correção sintática)
 - [ ] **6.8** Testar edge cases adicionais e corrigir bugs encontrados
 - [ ] **6.9** Garantir que cada membro do grupo consiga explicar qualquer parte do código
 

@@ -1,0 +1,18 @@
+// Programa simples: máximo entre dois números
+class Main {
+    public static void main(String[] args){
+        System.out.println(new Math().max(15, 42));
+    }
+}
+
+class Math {
+    public int max(int a, int b){
+        int resultado ;
+        if (a < b) {
+            resultado = b ;
+        } else {
+            resultado = a ;
+        }
+        return resultado ;
+    }
+}
