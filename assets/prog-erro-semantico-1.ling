@@ -1,0 +1,32 @@
+// Programa com Erros Semânticos 1 — incompatibilidade de tipos
+//
+// O PARSER ACEITA este programa (sintaxe correta).
+// O ANALISADOR SEMÂNTICO deve rejeitar por três razões:
+//
+// [ERRO 1] Linha 20 — argumento de tipo errado:
+//   calcular(true, 3) passa um boolean onde int é esperado.
+//   Regra violada: tipo do argumento deve corresponder ao tipo do parâmetro formal.
+//
+// [ERRO 2] Linha 29 — atribuição de tipo incompatível:
+//   resultado = intermediario  ->  boolean = int
+//   Regra violada: tipo da expressão à direita deve ser compatível com o da variável.
+//
+// [ERRO 3] Linha 30 — tipo de retorno incompatível:
+//   return resultado  ->  retorna boolean em método declarado como int
+//   Regra violada: tipo da expressão de retorno deve ser igual ao tipo de retorno do método.
+
+class Main {
+    public static void main(String[] args) {
+        System.out.println(new Calculadora().calcular(true, 3));
+    }
+}
+
+class Calculadora {
+    public int calcular(int a, int b) {
+        boolean resultado;
+        int intermediario;
+        intermediario = a + b;
+        resultado = intermediario;
+        return resultado;
+    }
+}

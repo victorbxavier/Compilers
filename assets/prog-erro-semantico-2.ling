@@ -1,0 +1,37 @@
+// Programa com Erros Semânticos 2 — escopo e condição inválida
+//
+// O PARSER ACEITA este programa (sintaxe correta).
+// O ANALISADOR SEMÂNTICO deve rejeitar por três razões:
+//
+// [ERRO 1] Classe Vazia — classe sem atributos e sem métodos:
+//   O trabalho define que uma classe sem atributos ou métodos é um erro semântico.
+//   Regra violada: toda classe deve ter ao menos um atributo ou método.
+//
+// [ERRO 2] Linha 31 — condição do if não é boolean:
+//   if (n)  ->  n é do tipo int
+//   Regra violada: a condição de if/while deve ter tipo boolean.
+//
+// [ERRO 3] Linha 32 — identificador não declarado:
+//   naoDeclarada é usada em expressão mas nunca foi declarada no escopo.
+//   Regra violada: todo identificador usado deve estar declarado no escopo atual.
+
+class Main {
+    public static void main(String[] args) {
+        System.out.println(new Verificador().checar(10));
+    }
+}
+
+class Vazia {
+}
+
+class Verificador {
+    public int checar(int n) {
+        int resultado;
+        resultado = 0;
+        if (n)
+            resultado = resultado + naoDeclarada;
+        else
+            resultado = 0;
+        return resultado;
+    }
+}
