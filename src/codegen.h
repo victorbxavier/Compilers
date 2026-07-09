@@ -276,28 +276,39 @@ private:
 
         // Method call: obj.method(args)
         if (auto* call = dynamic_cast<const MethodCallExp*>(exp)) {
-            std::string obj = generateExp(call->object.get());
-            tac_.emit(OpCode::PARAM, "", obj);  // objeto como primeiro param
-            for (auto& arg : call->args) {
-                std::string a = generateExp(arg.get());
-                tac_.emit(OpCode::PARAM, "", a);
-            }
-            std::string temp = tac_.newTemp();
-            int numArgs = (int)call->args.size() + 1;  // +1 para o objeto
-
-            // Resolve o nome completo do método (Classe.Metodo)
-            // Usa o tipo do objeto para determinar a classe
-            std::string methodLabel = call->method;
-            if (auto* newObj = dynamic_cast<const NewObjectExp*>(call->object.get())) {
-                methodLabel = newObj->className + "." + call->method;
-            } else if (auto* thisExp = dynamic_cast<const ThisExp*>(call->object.get())) {
-                (void)thisExp;
-                methodLabel = currentClass_ + "." + call->method;
-            }
-
-            tac_.emit(OpCode::CALL, temp, methodLabel, std::to_string(numArgs));
-            return temp;
-        }
+           // 1. Gera código para o objeto
+           std::string obj = generateExp(call->object.get());
+           tac_.emit(OpCode::PARAM, "", obj);
+    
+           // 2. Gera código para cada argumento
+           for (auto& arg : call->args) {
+               std::string a = generateExp(arg.get());
+               tac_.emit(OpCode::PARAM, "", a);
+           }
+           
+           // 3. Determina o tipo do objeto para resolver o método
+           std::string objType = inferObjectType(call->object.get());
+           if (objType.empty()) {
+               // Não foi possível determinar o tipo do objeto
+               // (já deve ter sido verificado pela análise semântica)
+               return "";
+           }
+           
+           // 4. Busca o método (com suporte a herança)
+           const Symbol* method = table_.lookupMethod(objType, call->method);
+           if (!method) {
+               // Erro: método não encontrado (não deveria acontecer se a análise semântica passou)
+               return "";
+           }
+           
+           // 5. Cria o label completo e gera a instrução CALL
+           std::string temp = tac_.newTemp();
+           int numArgs = (int)call->args.size() + 1;  // +1 para o objeto (this)
+           std::string methodLabel = objType + "." + call->method;
+           
+           tac_.emit(OpCode::CALL, temp, methodLabel, std::to_string(numArgs));
+           return temp;
+       }
 
         return "";
     }
@@ -321,6 +332,42 @@ private:
         std::string temp = tac_.newTemp();
         tac_.emit(op, temp, l, r);
         return temp;
+    }
+
+    std::string currentScope() const {
+        if (currentMethod_.empty()) return currentClass_;
+        return currentClass_ + "." + currentMethod_;
+    }
+
+    std::string inferObjectType(const Exp* exp) const {
+        if (!exp) return "";
+
+        // Caso 1: Identificador - buscar na tabela de símbolos
+        if (auto* id = dynamic_cast<const IdentifierExp*>(exp)) {
+            const Symbol* sym = table_.lookup(id->name, currentScope());
+            if (sym) return sym->type;
+            return "";
+        }
+
+        // Caso 2: new Classe()
+        if (auto* newObj = dynamic_cast<const NewObjectExp*>(exp)) {
+            return newObj->className;
+        }
+
+        // Caso 3: this
+        if (dynamic_cast<const ThisExp*>(exp)) {
+            return currentClass_;
+        }
+
+        // Caso 4: Chamada de método encadeada: obj.metodo1().metodo2()
+        if (auto* call = dynamic_cast<const MethodCallExp*>(exp)) {
+            std::string objType = inferObjectType(call->object.get());
+            const Symbol* method = table_.lookupMethod(objType, call->method);
+            if (method) return method->type;
+            return "";
+        }
+
+        return "";
     }
 };
 
