@@ -4,12 +4,12 @@ Projeto da disciplina DIM0164 — Compiladores (2026.1, UFRN).
 
 Implementação de um compilador para a linguagem MiniJava, composto por:
 
-- **Pré-processador** — remoção de comentários e espaços em excesso (integrado ao Flex)
 - **Analisador Léxico** — tokenização do código fonte usando Flex (reporta linha e coluna)
 - **Analisador Sintático** — parser recursivo descendente com construção de AST
 - **Árvore Sintática Abstrata (AST)** — representação estruturada do programa em memória
 - **Tabela de Símbolos** — registro de classes, métodos e variáveis com suporte a herança
 - **Analisador Semântico** — verificação de tipos, escopo, chamadas de método e compatibilidade
+- **Geração de Código Intermediário** — código de três endereços (3AC) gerado a partir da AST
 
 ## Pré-requisitos
 
@@ -37,13 +37,6 @@ Para limpar os artefatos e recompilar:
 make clean && make all
 ```
 
-### Compilação manual (sem Make)
-
-```bash
-flex src/lexer.l
-g++ lex.yy.cc -o lexer -lfl
-```
-
 ## Execução
 
 ```bash
@@ -52,50 +45,41 @@ g++ lex.yy.cc -o lexer -lfl
 
 ### Opções
 
-| Flag                 | Descrição                                          |
-| -------------------- | -------------------------------------------------- |
-| `--tokens`           | Exibe a lista de tokens (para após análise léxica) |
-| `--ast`              | Exibe a árvore sintática abstrata                  |
-| `--symbols`          | Exibe a tabela de símbolos                         |
-| `--suggest`          | Ativa sugestões de correção léxica e sintática     |
-| `--stop-first-error` | Para no primeiro erro léxico                       |
-| `--help`             | Exibe mensagem de ajuda                            |
+| Flag                 | Descrição                                              |
+| -------------------- | ------------------------------------------------------ |
+| `--tokens`           | Exibe a lista de tokens (para após análise léxica)     |
+| `--ast`              | Exibe a árvore sintática abstrata                      |
+| `--symbols`          | Exibe a tabela de símbolos                             |
+| `--no-ir`            | Oculta o código intermediário (3AC exibido por padrão) |
+| `--suggest`          | Ativa sugestões de correção léxica e sintática         |
+| `--stop-first-error` | Para no primeiro erro léxico                           |
+| `--help`             | Exibe mensagem de ajuda                                |
 
 ### Exemplos
 
 ```bash
-# Análise completa (léxica + sintática + semântica)
+# Compilação completa (exibe código intermediário por padrão)
 ./build/compiler assets/unidade-2/prog-factorial-v2.ling
-./build/compiler assets/unidade-2/prog-bubblesort-v2.ling
 
-# Exibir a AST e tabela de símbolos
-./build/compiler --ast --symbols assets/unidade-2/prog-factorial-v2.ling
+# Exibir AST + tabela + código intermediário
+./build/compiler --ast --symbols assets/unidade-2/prog-bubblesort-v2.ling
 
-# Exibir apenas a lista de tokens
+# Apenas tokens
 ./build/compiler --tokens assets/unidade-2/prog-factorial-v2.ling
 
-# Testar programa com erros semânticos
+# Ocultar código intermediário (só mostra mensagens de sucesso/erro)
+./build/compiler --no-ir assets/unidade-2/prog-factorial-v2.ling
+
+# Programa com erros semânticos
 ./build/compiler assets/unidade-2/prog-semantic-error-v2.ling
-
-# Testar erro sintático (if sem chaves)
-./build/compiler assets/unidade-2/prog-erro-sintatico-v2.ling
-
-# Erros léxicos com sugestões de correção
-./build/compiler --suggest assets/unidade-2/prog-erro-lexico.ling
-
-# Erros sintáticos com sugestões de correção
-./build/compiler --suggest assets/unidade-2/prog-erro-sintatico.ling
-
-# Parar no primeiro erro léxico
-./build/compiler --stop-first-error assets/unidade-2/prog-erro-lexico.ling
 ```
 
 ### Saída esperada
 
-- **Sucesso:** `=== Análise semântica concluída sem erros ===`
+- **Sucesso:** código intermediário (3AC) + `=== Compilação concluída com sucesso ===`
 - **Erro léxico:** mensagem com linha:coluna e sugestão de correção
-- **Erro sintático:** mensagem com linha:coluna, token esperado, token encontrado e sugestão com `--suggest`
-- **Erro semântico:** mensagem com linha, tipo do erro e contexto
+- **Erro sintático:** mensagem com linha:coluna, token esperado vs encontrado
+- **Erro semântico:** mensagem com linha e descrição do erro de tipo/escopo
 
 ## Pipeline de Compilação
 
@@ -121,34 +105,33 @@ Código Fonte (.ling)
 └─────────────┘
        │
        ▼
-   Resultado: sucesso ou lista de erros
+┌─────────────┐
+│  Geração de │──▶ Código de Três Endereços (3AC)
+│  Código     │
+└─────────────┘
+       │
+       ▼
+   Saída: código intermediário ou lista de erros
 ```
 
 ## Estrutura do Projeto
 
 ```
 src/
-├── token.h               # Definição dos tipos de token (enum + struct com linha:coluna)
-├── lexer.l               # Analisador léxico (Flex)
-├── ast.h                 # Nós da Árvore Sintática Abstrata
-├── parser.h              # Analisador sintático (constrói AST + preenche tabela)
-├── symbol_table.h        # Tabela de símbolos (com busca hierárquica e herança)
-├── semantic_analyzer.h   # Analisador semântico (percorre AST + consulta tabela)
-└── main.cpp              # Programa principal (orquestra o pipeline)
+├── token.h                # Definição dos tipos de token
+├── lexer.l                # Analisador léxico (Flex)
+├── ast.h                  # Nós da Árvore Sintática Abstrata
+├── parser.h               # Analisador sintático (constrói AST)
+├── symbol_table.h         # Tabela de símbolos
+├── semantic_analyzer.h    # Analisador semântico
+├── three_address_code.h   # Estrutura do código de três endereços
+├── codegen.h              # Gerador de código intermediário
+└── main.cpp               # Programa principal (pipeline)
 assets/
-├── unidade-1/            # Programas de teste da 1ª unidade (gramática antiga)
-│   ├── prog-factorial.ling
-│   ├── prog-bubblesort.ling
-│   └── ...
-└── unidade-2/            # Programas de teste da 2ª unidade (gramática nova)
-    ├── prog-factorial-v2.ling        # Correto — recursão, if/else com {}
-    ├── prog-bubblesort-v2.ling       # Correto — arrays, herança, while
-    ├── prog-semantic-error-v2.ling   # 4 erros semânticos
-    ├── prog-erro-sintatico-v2.ling   # Erro sintático (if sem chaves)
-    └── prog-erro-lexico.ling         # Erros léxicos (tokens inválidos)
-docs/                     # Gramática, checklists e documentação
-relatorio/                # Relatório técnico (LaTeX)
-Makefile                  # Automação de build
+├── unidade-1/             # Programas de teste (gramática antiga)
+└── unidade-2/             # Programas de teste (gramática nova)
+docs/                      # Documentação, checklists, fluxos
+Makefile                   # Automação de build
 ```
 
 ## Equipe

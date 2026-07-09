@@ -11,7 +11,8 @@ LEX_SRC = $(SRC_DIR)/lexer.l
 LEX_OUT = $(BUILD_DIR)/lex.yy.c
 
 HEADERS = $(SRC_DIR)/token.h $(SRC_DIR)/ast.h $(SRC_DIR)/parser.h \
-          $(SRC_DIR)/symbol_table.h $(SRC_DIR)/semantic_analyzer.h
+          $(SRC_DIR)/symbol_table.h $(SRC_DIR)/semantic_analyzer.h \
+          $(SRC_DIR)/three_address_code.h $(SRC_DIR)/codegen.h
 
 OBJS = $(BUILD_DIR)/main.o $(BUILD_DIR)/lex.yy.o
 
@@ -35,11 +36,11 @@ $(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $(TARGET) $(OBJS)
 
 test: $(TARGET)
-	@echo "=== Teste: prog-factorial-v2.ling ==="
-	./$(TARGET) --ast --symbols assets/unidade-2/prog-factorial-v2.ling
+	@echo "=== Teste: prog-factorial-v2.ling (3AC) ==="
+	./$(TARGET) --ir assets/unidade-2/prog-factorial-v2.ling
 	@echo ""
-	@echo "=== Teste: prog-bubblesort-v2.ling ==="
-	./$(TARGET) --ast --symbols assets/unidade-2/prog-bubblesort-v2.ling
+	@echo "=== Teste: prog-bubblesort-v2.ling (3AC) ==="
+	./$(TARGET) --ir assets/unidade-2/prog-bubblesort-v2.ling
 
 clean:
 	rm -rf $(BUILD_DIR)

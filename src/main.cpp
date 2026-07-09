@@ -1,14 +1,15 @@
 /**
  * @file main.cpp
- * @brief Programa principal do compilador MiniJava — Unidade 2.
+ * @brief Programa principal do compilador MiniJava — Unidade 3.
  *
- * Pipeline: Lexer → Parser (gera AST + Tabela) → Análise Semântica → Saída
+ * Pipeline: Lexer → Parser (AST + Tabela) → Análise Semântica → Geração de Código (3AC) → Saída
  *
  * Flags:
- *   --tokens           Exibe lista de tokens (para após lexer)
+ *   --tokens           Exibe lista de tokens
  *   --ast              Exibe a árvore sintática abstrata
  *   --symbols          Exibe a tabela de símbolos
- *   --suggest          Ativa sugestões de correção léxica e sintática
+ *   --no-ir            Oculta o código intermediário (exibido por padrão)
+ *   --suggest          Ativa sugestões de correção
  *   --stop-first-error Para no primeiro erro léxico
  *   --help             Exibe ajuda
  */
@@ -16,8 +17,10 @@
 #include "token.h"
 #include "parser.h"
 #include "semantic_analyzer.h"
+#include "codegen.h"
 #include <iostream>
 #include <cstring>
+#include <memory>
 
 // Declarações externas do Flex
 extern std::vector<Token> tokenList;
@@ -35,6 +38,7 @@ void printUsage(const char* progName) {
               << "  --tokens           Exibe a lista de tokens\n"
               << "  --ast              Exibe a árvore sintática abstrata\n"
               << "  --symbols          Exibe a tabela de símbolos\n"
+              << "  --no-ir            Oculta o código intermediário (3AC)\n"
               << "  --suggest          Ativa sugestões de correção\n"
               << "  --stop-first-error Para no primeiro erro léxico\n"
               << "  --help             Exibe esta mensagem\n";
@@ -49,6 +53,7 @@ int main(int argc, char* argv[]) {
     bool flagTokens = false;
     bool flagAst = false;
     bool flagSymbols = false;
+    bool flagNoIR = false;
     bool flagSuggest = false;
     bool flagStopFirst = false;
     const char* filename = nullptr;
@@ -60,6 +65,8 @@ int main(int argc, char* argv[]) {
             flagAst = true;
         } else if (strcmp(argv[i], "--symbols") == 0) {
             flagSymbols = true;
+        } else if (strcmp(argv[i], "--no-ir") == 0) {
+            flagNoIR = true;
         } else if (strcmp(argv[i], "--suggest") == 0) {
             flagSuggest = true;
         } else if (strcmp(argv[i], "--stop-first-error") == 0) {
@@ -116,7 +123,7 @@ int main(int argc, char* argv[]) {
 
     // === ETAPA 2: Análise Sintática (constrói AST + preenche tabela) ===
     Parser parser(tokenList, flagStopFirst, flagSuggest);
-    auto ast = parser.parse();
+    std::unique_ptr<Program> ast = parser.parse();
 
     if (!ast || parser.hadError()) {
         std::cerr << "\n=== Análise sintática falhou (" << parser.getErrorCount()
@@ -148,5 +155,16 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    // === ETAPA 4: Geração de Código Intermediário (3AC) ===
+    CodeGenerator codegen(parser.getSymbolTable());
+    TAC tac = codegen.generate(ast.get());
+
+    if (!flagNoIR) {
+        std::cout << "\n=== Código Intermediário (3AC) — "
+                  << tac.size() << " instruções ===" << std::endl;
+        tac.print();
+    }
+
+    std::cout << "\n=== Compilação concluída com sucesso ===" << std::endl;
     return 0;
 }
