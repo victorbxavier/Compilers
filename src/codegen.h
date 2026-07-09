@@ -308,6 +308,9 @@ private:
            return temp;
        }
 
+        return "";
+    }
+
     // ==================== Auxiliar para operações binárias ====================
 
     /**
@@ -328,38 +331,42 @@ private:
         tac_.emit(op, temp, l, r);
         return temp;
     }
-    
-    
+
+    std::string currentScope() const {
+        if (currentMethod_.empty()) return currentClass_;
+        return currentClass_ + "." + currentMethod_;
+    }
+
     std::string inferObjectType(const Exp* exp) const {
-    if (!exp) return "";
-    
-    // Caso 1: Identificador - buscar na tabela de símbolos
-    if (auto* id = dynamic_cast<const IdentifierExp*>(exp)) {
-        const Symbol* sym = table_.lookup(id->name, currentScope());
-        if (sym) return sym->type;
+        if (!exp) return "";
+
+        // Caso 1: Identificador - buscar na tabela de símbolos
+        if (auto* id = dynamic_cast<const IdentifierExp*>(exp)) {
+            const Symbol* sym = table_.lookup(id->name, currentScope());
+            if (sym) return sym->type;
+            return "";
+        }
+
+        // Caso 2: new Classe()
+        if (auto* newObj = dynamic_cast<const NewObjectExp*>(exp)) {
+            return newObj->className;
+        }
+
+        // Caso 3: this
+        if (dynamic_cast<const ThisExp*>(exp)) {
+            return currentClass_;
+        }
+
+        // Caso 4: Chamada de método encadeada: obj.metodo1().metodo2()
+        if (auto* call = dynamic_cast<const MethodCallExp*>(exp)) {
+            std::string objType = inferObjectType(call->object.get());
+            const Symbol* method = table_.lookupMethod(objType, call->method);
+            if (method) return method->type;
+            return "";
+        }
+
         return "";
     }
-    
-    // Caso 2: new Classe()
-    if (auto* newObj = dynamic_cast<const NewObjectExp*>(exp)) {
-        return newObj->className;
-    }
-    
-    // Caso 3: this
-    if (dynamic_cast<const ThisExp*>(exp)) {
-        return currentClass_;
-    }
-    
-    // Caso 4: Chamada de método encadeada: obj.metodo1().metodo2()
-    if (auto* call = dynamic_cast<const MethodCallExp*>(exp)) {
-        std::string objType = inferObjectType(call->object.get());
-        const Symbol* method = table_.lookupMethod(objType, call->method);
-        if (method) return method->type;
-        return "";
-    }
-    
-    return "";
-}
 };
 
 #endif // CODEGEN_H
