@@ -156,8 +156,8 @@ int main(int argc, char* argv[]) {
     }
 
     // === ETAPA 4: Geração de Código Intermediário (3AC) ===
-    CodeGenerator codegen(parser.getSymbolTable());
-    TAC tac = codegen.generate(ast.get());
+    CodeGenerator codegen(parser.getSymbolTable(), ast.get()); // .get() extrai o ponteiro cru do unique_ptr
+    TAC tac = codegen.generate();
 
     if (!flagNoIR) {
         std::cout << "\n=== Código Intermediário (3AC) — "

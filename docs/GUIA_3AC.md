@@ -27,7 +27,7 @@ O 3AC "explode" expressões complexas em passos atômicos, cada um com uma opera
 
 ### O problema: a AST não é executável
 
-A AST representa a **estrutura** do programa (árvore hierárquica), mas não descreve a **sequência de passos** que uma máquina precisa executar. Por exemplo, uma árvore `Plus(Times(b, c), a)` não diz explicitamente "primeiro calcule b*c, guarde num lugar, depois some com a".
+A AST representa a **estrutura** do programa (árvore hierárquica), mas não descreve a **sequência de passos** que uma máquina precisa executar. Por exemplo, uma árvore `Plus(Times(b, c), a)` não diz explicitamente "primeiro calcule b\*c, guarde num lugar, depois some com a".
 
 ### A solução: uma representação linear e explícita
 
@@ -40,6 +40,7 @@ O 3AC transforma a árvore numa **lista sequencial de instruções simples** que
 ### 1. Desacoplamento (portabilidade)
 
 O 3AC é **independente de máquina**. O mesmo código intermediário pode ser traduzido para x86, ARM, TAM ou qualquer outra arquitetura. Isso separa o compilador em:
+
 - **Front-end** (léxico + sintático + semântico → 3AC): específico da linguagem fonte
 - **Back-end** (3AC → assembly): específico da arquitetura alvo
 
@@ -48,6 +49,7 @@ Se quiser portar o compilador pra outra máquina, só reescreve o back-end.
 ### 2. Facilita otimizações
 
 É muito mais fácil otimizar uma lista linear de instruções simples do que uma árvore aninhada. Exemplos de otimizações aplicáveis ao 3AC:
+
 - **Eliminação de subexpressões comuns**: se `t1 = add x y` já existe, não precisa calcular de novo
 - **Propagação de constantes**: se `t1 = 10` e depois `t2 = add t1 5`, substitui por `t2 = 15`
 - **Eliminação de código morto**: instruções cujo resultado nunca é usado podem ser removidas
@@ -71,7 +73,7 @@ Código Fonte (.ling)
     Lexer → Parser → AST → Análise Semântica
        │
        ▼ (Geração de código intermediário)
-    Percorre a AST recursivamente → gera lista de instruções 3AC
+    CodeGenerator(tabela, AST) → generate() → lista de instruções 3AC
        │
        ▼ (Back-end — futuro/opcional)
     3AC → Otimizações → Assembly da máquina alvo (TAM, x86, ARM...)
@@ -105,15 +107,16 @@ t9 = mul num t8               ← num * resultado
 ### Labels (`L0`, `L1`, `L2`, ...)
 
 Marcam pontos no código para onde instruções de desvio (`goto`, `ifFalse`) podem saltar. São usados para implementar:
+
 - **if/else**: pula o bloco then ou else
 - **while**: volta ao início do loop ou sai dele
 
 ### Diferença entre `call` e `goto`
 
-| Instrução | Vai pra outro lugar? | Volta automaticamente? | Uso |
-|-----------|---------------------|----------------------|-----|
-| `goto L` | Sim | Não | Controle de fluxo (while, if) |
-| `call F, N` | Sim | Sim (quando F faz `return`) | Chamada de método |
+| Instrução   | Vai pra outro lugar? | Volta automaticamente?      | Uso                           |
+| ----------- | -------------------- | --------------------------- | ----------------------------- |
+| `goto L`    | Sim                  | Não                         | Controle de fluxo (while, if) |
+| `call F, N` | Sim                  | Sim (quando F faz `return`) | Chamada de método             |
 
 `call` é como ligar pra alguém — você fala, espera a resposta e continua. `goto` é como pegar outra estrada — não tem volta automática.
 
@@ -123,55 +126,56 @@ Marcam pontos no código para onde instruções de desvio (`goto`, `ifFalse`) po
 
 ### Operações Aritméticas
 
-| Instrução | Significado | Exemplo no código fonte |
-|-----------|-------------|------------------------|
-| `t1 = add x y` | t1 recebe x + y | `x + y` |
-| `t1 = sub x y` | t1 recebe x - y | `x - y` |
-| `t1 = mul x y` | t1 recebe x * y | `x * y` |
+| Instrução      | Significado      | Exemplo no código fonte |
+| -------------- | ---------------- | ----------------------- |
+| `t1 = add x y` | t1 recebe x + y  | `x + y`                 |
+| `t1 = sub x y` | t1 recebe x - y  | `x - y`                 |
+| `t1 = mul x y` | t1 recebe x \* y | `x * y`                 |
 
 Sempre geram um temporário novo com o resultado. Os operandos `x` e `y` podem ser variáveis do programa, constantes (em temporários) ou outros temporários.
 
 ### Operações Relacionais e Lógicas
 
-| Instrução | Significado | Resultado |
-|-----------|-------------|-----------|
-| `t1 = lt x y` | t1 recebe x < y | 1 (true) ou 0 (false) |
-| `t1 = and x y` | t1 recebe x && y | 1 ou 0 |
-| `t1 = not x` | t1 recebe !x | 1 ou 0 |
+| Instrução      | Significado      | Resultado             |
+| -------------- | ---------------- | --------------------- |
+| `t1 = lt x y`  | t1 recebe x < y  | 1 (true) ou 0 (false) |
+| `t1 = and x y` | t1 recebe x && y | 1 ou 0                |
+| `t1 = not x`   | t1 recebe !x     | 1 ou 0                |
 
 O resultado é sempre 0 ou 1 (representação numérica de boolean).
 
 ### Cópia e Literais
 
-| Instrução | Significado | Quando é gerado |
-|-----------|-------------|-----------------|
-| `x = t1` | Copia o valor de t1 para x | Atribuição `x = expressão;` |
-| `t1 = 10` | Carrega constante 10 em t1 | Literal inteiro no código |
-| `t1 = 1` | Carrega 1 (true) em t1 | Literal `true` |
-| `t1 = 0` | Carrega 0 (false) em t1 | Literal `false` |
+| Instrução | Significado                | Quando é gerado             |
+| --------- | -------------------------- | --------------------------- |
+| `x = t1`  | Copia o valor de t1 para x | Atribuição `x = expressão;` |
+| `t1 = 10` | Carrega constante 10 em t1 | Literal inteiro no código   |
+| `t1 = 1`  | Carrega 1 (true) em t1     | Literal `true`              |
+| `t1 = 0`  | Carrega 0 (false) em t1    | Literal `false`             |
 
 **Por que literais geram um temporário?** Porque no 3AC, operações como `add` precisam de endereços (nomes) nos operandos. O número `10` não tem endereço — precisa ser armazenado num temporário primeiro pra poder ser referenciado.
 
 ### Controle de Fluxo
 
-| Instrução | Significado | Quando é usado |
-|-----------|-------------|----------------|
-| `L0:` | Define um rótulo (label) — marca um ponto no código | Início de while, bloco else, fim de if |
-| `goto L0` | Salta incondicionalmente para L0 | Volta ao início do while, pula o else |
-| `ifFalse t1 goto L0` | Se t1 é 0 (false), salta para L0 | Condição do if/while é falsa → pula bloco |
-| `if t1 goto L0` | Se t1 é 1 (true), salta para L0 | (não usado atualmente, mas disponível) |
+| Instrução            | Significado                                         | Quando é usado                            |
+| -------------------- | --------------------------------------------------- | ----------------------------------------- |
+| `L0:`                | Define um rótulo (label) — marca um ponto no código | Início de while, bloco else, fim de if    |
+| `goto L0`            | Salta incondicionalmente para L0                    | Volta ao início do while, pula o else     |
+| `ifFalse t1 goto L0` | Se t1 é 0 (false), salta para L0                    | Condição do if/while é falsa → pula bloco |
+| `if t1 goto L0`      | Se t1 é 1 (true), salta para L0                     | (não usado atualmente, mas disponível)    |
 
 **Decisão de projeto:** Usamos `ifFalse` em vez de `ifTrue` porque o padrão natural é "se a condição falha, pule o bloco". Isso simplifica os templates — o código do bloco "then" fica logo após o teste, sem precisar inverter a lógica.
 
 ### Chamada de Funções
 
-| Instrução | Significado | Quando é usado |
-|-----------|-------------|----------------|
-| `param t0` | Prepara t0 como argumento da próxima call | Antes de cada chamada de método |
-| `t2 = call metodo, 2` | Chama "metodo" com 2 argumentos preparados, resultado em t2 | `obj.metodo(arg)` |
-| `return t1` | Retorna o valor de t1 para o chamador | `return expressão;` |
+| Instrução             | Significado                                                 | Quando é usado                  |
+| --------------------- | ----------------------------------------------------------- | ------------------------------- |
+| `param t0`            | Prepara t0 como argumento da próxima call                   | Antes de cada chamada de método |
+| `t2 = call metodo, 2` | Chama "metodo" com 2 argumentos preparados, resultado em t2 | `obj.metodo(arg)`               |
+| `return t1`           | Retorna o valor de t1 para o chamador                       | `return expressão;`             |
 
 **Como funciona a sequência param/call:**
+
 ```
 param t0          ← 1º argumento (o objeto, será o "this" do método)
 param t1          ← 2º argumento (argumento real passado)
@@ -182,30 +186,30 @@ O número após a vírgula (2) diz quantos `param` foram emitidos antes.
 
 ### I/O
 
-| Instrução | Significado | Quando é usado |
-|-----------|-------------|----------------|
+| Instrução  | Significado           | Quando é usado                  |
+| ---------- | --------------------- | ------------------------------- |
 | `print t1` | Imprime o valor de t1 | `System.out.println(expressão)` |
 
 ### Arrays
 
-| Instrução | Significado | Quando é usado |
-|-----------|-------------|----------------|
-| `t1 = new int[t0]` | Aloca array de tamanho t0, endereço em t1 | `new int[tamanho]` |
-| `t1 = a[t0]` | Lê posição t0 do array a, valor em t1 | `a[i]` como expressão |
-| `a[t0] = t1` | Escreve t1 na posição t0 do array a | `a[i] = valor;` |
-| `t1 = length a` | Obtém tamanho do array a | `a.length` |
+| Instrução          | Significado                               | Quando é usado        |
+| ------------------ | ----------------------------------------- | --------------------- |
+| `t1 = new int[t0]` | Aloca array de tamanho t0, endereço em t1 | `new int[tamanho]`    |
+| `t1 = a[t0]`       | Lê posição t0 do array a, valor em t1     | `a[i]` como expressão |
+| `a[t0] = t1`       | Escreve t1 na posição t0 do array a       | `a[i] = valor;`       |
+| `t1 = length a`    | Obtém tamanho do array a                  | `a.length`            |
 
 ### Objetos
 
-| Instrução | Significado | Quando é usado |
-|-----------|-------------|----------------|
+| Instrução         | Significado                                 | Quando é usado     |
+| ----------------- | ------------------------------------------- | ------------------ |
 | `t0 = new Classe` | Aloca novo objeto da classe, endereço em t0 | `new NomeClasse()` |
 
 ### Programa
 
-| Instrução | Significado | Quando é usado |
-|-----------|-------------|----------------|
-| `halt` | Encerra execução do programa | Fim do main |
+| Instrução | Significado                  | Quando é usado |
+| --------- | ---------------------------- | -------------- |
+| `halt`    | Encerra execução do programa | Fim do main    |
 
 ---
 
@@ -234,6 +238,7 @@ O número após a vírgula (2) diz quantos `param` foram emitidos antes.
 **Decisão:** Usamos `ifFalse condição goto L` (salta se falso).
 
 **Justificativa:** O padrão natural é: se a condição é verdadeira, executa o bloco (que vem logo em seguida no código). Se é falsa, pula pro label. Isso evita inverter a lógica da condição e mantém o template simples:
+
 ```
 (testa condição)
 ifFalse → pula bloco

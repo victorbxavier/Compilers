@@ -17,24 +17,25 @@
 
 class CodeGenerator {
 public:
-    CodeGenerator(const SymbolTable& table) : table_(table) {}
+    CodeGenerator(const SymbolTable& table, const Program* ast)
+        : table_(table), ast_(ast) {}
 
     /**
      * @brief Gera código intermediário para o programa inteiro.
      * @return Objeto TAC com todas as instruções geradas.
      */
-    TAC generate(const Program* program) {
-        if (!program) return tac_;
+    TAC generate() {
+        if (!ast_) return tac_;
 
         // Gera código para o main
         tac_.emit(OpCode::LABEL, "", "main");
-        for (auto& stmt : program->mainClass->body) {
+        for (auto& stmt : ast_->mainClass->body) {
             generateStmt(stmt.get());
         }
         tac_.emit(OpCode::HALT);
 
         // Gera código para cada método de cada classe
-        for (auto& cls : program->classes) {
+        for (auto& cls : ast_->classes) {
             currentClass_ = cls->name;
             for (auto& method : cls->methods) {
                 generateMethod(method.get(), cls->name);
@@ -47,6 +48,7 @@ public:
 private:
     TAC tac_;
     const SymbolTable& table_;
+    const Program* ast_;
     std::string currentClass_;
     std::string currentMethod_;
 

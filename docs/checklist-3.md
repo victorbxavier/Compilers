@@ -32,7 +32,7 @@ O módulo percorre a AST recursivamente (pós-ordem: primeiro os filhos, depois 
 
 - [x] **2.1** Criar `src/codegen.h` com classe `CodeGenerator`
   - [x] Recebe a AST e a tabela de símbolos
-  - [x] Método principal: `generate(Program*)` → retorna lista de instruções 3AC
+  - [x] Método principal: `generate()` → retorna lista de instruções 3AC
 - [x] **2.2** Geração para expressões aritméticas e lógicas
   - [x] `a + b` → `t1 = add a b`
   - [x] `a - b` → `t1 = sub a b`
@@ -129,6 +129,7 @@ A máquina TAM (Triangle Abstract Machine) é baseada em pilha. A tradução seg
 ## Exemplo: Código Fonte → 3AC
 
 ### Programa:
+
 ```java
 class Factorial {
     public static void main(String[] a) {
@@ -146,6 +147,7 @@ class Fac {
 ```
 
 ### Código de 3 endereços esperado:
+
 ```
 main:
     t0 = new Fac           // cria objeto

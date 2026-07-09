@@ -47,36 +47,36 @@ AGORA (Unidade 3):  .ling → Lexer → Parser (AST) → Semântica → CodeGen 
 
 **Classe `CodeGenerator`:**
 
-- Recebe a AST e a tabela de símbolos
-- Método principal: `generate(Program*)` → retorna objeto `TAC`
+- Recebe a tabela de símbolos e a AST no construtor
+- Método principal: `generate()` → retorna objeto `TAC`
 - Percorre em **pós-ordem**: primeiro gera código dos filhos, depois do nó atual
 
 **Geração por tipo de nó:**
 
-| Nó AST | Instruções 3AC geradas |
-|--------|----------------------|
-| `PlusExp(a, b)` | `t = add left right` |
-| `MinusExp(a, b)` | `t = sub left right` |
-| `TimesExp(a, b)` | `t = mul left right` |
-| `LessThanExp(a, b)` | `t = lt left right` |
-| `AndExp(a, b)` | `t = and left right` |
-| `NotExp(a)` | `t = not val` |
-| `IntLiteralExp(n)` | `t = n` |
-| `TrueLiteralExp` | `t = 1` |
-| `FalseLiteralExp` | `t = 0` |
-| `IdentifierExp(x)` | retorna `x` (sem instrução) |
-| `ThisExp` | retorna `this` |
-| `NewObjectExp(C)` | `t = new C` |
-| `NewArrayExp(size)` | `t = new int[size]` |
-| `ArrayLookupExp(a, i)` | `t = a[i]` |
-| `ArrayLengthExp(a)` | `t = length a` |
-| `MethodCallExp(obj, m, args)` | `param obj`, `param args...`, `t = call m, N` |
-| `AssignStmt(x, E)` | `x = tempE` |
-| `ArrayAssignStmt(a, i, E)` | `a[i] = tempE` |
-| `PrintStmt(E)` | `print tempE` |
-| `IfStmt(c, then, else)` | `ifFalse c goto Lelse`, then, `goto Lend`, `Lelse:`, else, `Lend:` |
-| `WhileStmt(c, body)` | `Lstart:`, `ifFalse c goto Lend`, body, `goto Lstart`, `Lend:` |
-| `MethodDecl` | `label Classe.Método:`, body, `return retVal` |
+| Nó AST                        | Instruções 3AC geradas                                             |
+| ----------------------------- | ------------------------------------------------------------------ |
+| `PlusExp(a, b)`               | `t = add left right`                                               |
+| `MinusExp(a, b)`              | `t = sub left right`                                               |
+| `TimesExp(a, b)`              | `t = mul left right`                                               |
+| `LessThanExp(a, b)`           | `t = lt left right`                                                |
+| `AndExp(a, b)`                | `t = and left right`                                               |
+| `NotExp(a)`                   | `t = not val`                                                      |
+| `IntLiteralExp(n)`            | `t = n`                                                            |
+| `TrueLiteralExp`              | `t = 1`                                                            |
+| `FalseLiteralExp`             | `t = 0`                                                            |
+| `IdentifierExp(x)`            | retorna `x` (sem instrução)                                        |
+| `ThisExp`                     | retorna `this`                                                     |
+| `NewObjectExp(C)`             | `t = new C`                                                        |
+| `NewArrayExp(size)`           | `t = new int[size]`                                                |
+| `ArrayLookupExp(a, i)`        | `t = a[i]`                                                         |
+| `ArrayLengthExp(a)`           | `t = length a`                                                     |
+| `MethodCallExp(obj, m, args)` | `param obj`, `param args...`, `t = call m, N`                      |
+| `AssignStmt(x, E)`            | `x = tempE`                                                        |
+| `ArrayAssignStmt(a, i, E)`    | `a[i] = tempE`                                                     |
+| `PrintStmt(E)`                | `print tempE`                                                      |
+| `IfStmt(c, then, else)`       | `ifFalse c goto Lelse`, then, `goto Lend`, `Lelse:`, else, `Lend:` |
+| `WhileStmt(c, body)`          | `Lstart:`, `ifFalse c goto Lend`, body, `goto Lstart`, `Lend:`     |
+| `MethodDecl`                  | `label Classe.Método:`, body, `return retVal`                      |
 
 ---
 

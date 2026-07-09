@@ -25,11 +25,13 @@ O compilador agora executa **5 etapas sequenciais**:
 ## O Que Mudou da Unidade 2 para a Unidade 3
 
 ### Unidade 2: Front-end completo (validação)
+
 ```
 .ling → Lexer → Parser (AST) → Análise Semântica → "ok/erros"
 ```
 
 ### Unidade 3: + Back-end (geração de código)
+
 ```
 .ling → Lexer → Parser (AST) → Análise Semântica → Geração 3AC → Código Intermediário
 ```
@@ -47,6 +49,7 @@ resultado = operação operando1 operando2
 ```
 
 Exemplos:
+
 ```
 t1 = add x y       // t1 recebe x + y
 t2 = lt t1 10      // t2 recebe t1 < 10 (boolean)
@@ -69,6 +72,7 @@ num_aux = t3        // cópia simples
 Variáveis criadas pelo compilador para guardar resultados intermediários.
 
 Expressão `num * (this.ComputeFac(num - 1))` vira:
+
 ```
 t6 = 1
 t7 = sub num t6         // num - 1
@@ -96,6 +100,7 @@ L1:                      // fim do while
 ## Templates de Geração
 
 ### Expressão binária: `a + b`
+
 ```
 (gera código de a → resultado em left)
 (gera código de b → resultado em right)
@@ -103,6 +108,7 @@ temp = add left right
 ```
 
 ### If/Else:
+
 ```
 (gera código da condição → cond)
 ifFalse cond goto Lelse
@@ -114,6 +120,7 @@ Lfim:
 ```
 
 ### While:
+
 ```
 Linicio:
 (gera código da condição → cond)
@@ -124,6 +131,7 @@ Lfim:
 ```
 
 ### Chamada de método: `obj.method(arg1, arg2)`
+
 ```
 (gera código de obj → t_obj)
 param t_obj
@@ -135,6 +143,7 @@ temp = call method, 3
 ```
 
 ### Atribuição em array: `a[i] = E`
+
 ```
 (gera código de i → t_idx)
 (gera código de E → t_val)
@@ -146,6 +155,7 @@ a[t_idx] = t_val
 ## Exemplo Completo: Factorial
 
 ### Código fonte:
+
 ```java
 class Factorial {
     public static void main(String[] a) {
@@ -163,6 +173,7 @@ class Fac {
 ```
 
 ### Código 3AC gerado:
+
 ```
 main:
     t0 = new Fac
@@ -200,7 +211,7 @@ L1:
 2.  Análise léxica → tokenList
 3.  Análise sintática → AST + tabela de símbolos
 4.  Análise semântica → verifica tipos/escopo
-5.  Geração de código → percorre AST, produz lista de instruções 3AC
+5.  Geração de código → CodeGenerator recebe AST + tabela no construtor, generate() produz lista de instruções 3AC
 6.  Imprime código intermediário (a menos que --no-ir)
 7.  "Compilação concluída com sucesso"
 ```
@@ -228,17 +239,17 @@ token.h ◄───────────────────────
 
 ## Resumo Rápido
 
-| Arquivo | Etapa | Entrada | Saída |
-|---------|-------|---------|-------|
-| `token.h` | — | — | Definições de tokens |
-| `lexer.l` | Léxica | Chars | Tokens |
-| `ast.h` | — | — | Definição dos nós da AST |
-| `parser.h` | Sintática | Tokens | AST + Tabela |
-| `symbol_table.h` | — | — | Registro de declarações |
-| `semantic_analyzer.h` | Semântica | AST + Tabela | Erros semânticos |
-| `three_address_code.h` | — | — | Estrutura de instruções 3AC |
-| `codegen.h` | Geração | AST + Tabela | Lista de instruções 3AC |
-| `main.cpp` | Orquestração | CLI + arquivo | Pipeline completo |
+| Arquivo                | Etapa        | Entrada       | Saída                       |
+| ---------------------- | ------------ | ------------- | --------------------------- |
+| `token.h`              | —            | —             | Definições de tokens        |
+| `lexer.l`              | Léxica       | Chars         | Tokens                      |
+| `ast.h`                | —            | —             | Definição dos nós da AST    |
+| `parser.h`             | Sintática    | Tokens        | AST + Tabela                |
+| `symbol_table.h`       | —            | —             | Registro de declarações     |
+| `semantic_analyzer.h`  | Semântica    | AST + Tabela  | Erros semânticos            |
+| `three_address_code.h` | —            | —             | Estrutura de instruções 3AC |
+| `codegen.h`            | Geração      | AST + Tabela  | Lista de instruções 3AC     |
+| `main.cpp`             | Orquestração | CLI + arquivo | Pipeline completo           |
 
 ---
 
